@@ -1,0 +1,42 @@
+# .NET build intermediates
+**/[Bb]in/
+**/[Oo]bj/
+*.dll
+*.pdb
+*.deps.json
+*.runtimeconfig.json
+
+# Local SDK and package caches
+/.dotnet-cli/
+/.nuget/
+/packages/
+
+# IDE and user-specific files
+/.vs/
+/.vscode/
+/.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test, coverage, and diagnostic output
+/TestResults/
+**/TestResults/
+*.coverage
+*.coveragexml
+*.trx
+*.log
+*.dmp
+
+# Published artifacts: keep only the distributable ZIP archive
+/artifacts/*
+!/artifacts/QuotaWisp-win-x64.zip
+
+# Temporary and OS-generated files
+*.tmp
+*.temp
+~$*
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -1,6 +1,6 @@
 # Quota Wisp for Windows
 
-An original, local-only Windows 11 desktop pet that shows Codex quota. If you are looking for the similar project for MacOS, check [codex-quota-pet](https://github.com/danya-kim99/codex-quota-pet), who inspired me.
+An original, local-only Windows 11 desktop pet that shows Codex quota. For the macOS project that inspired this Windows implementation, see [codex-quota-pet](https://github.com/danya-kim99/codex-quota-pet).
 
 ## Features
 
@@ -8,8 +8,10 @@ An original, local-only Windows 11 desktop pet that shows Codex quota. If you ar
 - Primary and secondary quota, reset time, Standard/Turbo mode.
 - Local Codex App Server JSON-RPC; no telemetry and no remote service.
 - Automatic reconnect, event refresh, 60-second polling and hover refresh.
+- Stale callbacks from replaced Codex connections are discarded.
 - Smooth and pixel tooltip styles, English and Russian UI.
 - S/M/L sizes, drag, lock, click-through, multi-monitor position restore.
+- Transparent window padding passes pointer input to applications underneath.
 - Hide in fullscreen apps and user-level Windows startup.
 - 30-day local quota history, consumption reactions and weighted interactive objects.
 
@@ -61,4 +63,8 @@ The project targets Windows 11 x64 and .NET 8 WPF. It has no third-party runtime
 
 ## Artwork
 
-`Assets/quota-wisp.png` is an original AI-generated project asset created for this Windows implementation. Generation prompt: a friendly full moon with soft craters; transparent background; polished pixel-art-inspired 2D sprite; no sun, planets, text, logos, trademarks, or existing character resemblance. It was generated with the built-in image generation tool.
+`Assets/moon-master.png` is an original AI-generated project asset created for this Windows implementation. Generation prompt: a realistic full disk of Earth's Moon with neutral white and gray crater detail, transparent background, and no blue tint, atmosphere, baked-in halo, text, logos, or additional objects. It was generated with the built-in image generation tool. `generate-moon-assets.ps1` deterministically produces the ten neutral-color quota phases and the application icon from that master; the first waning phase starts at exactly 90% remaining quota. WPF adds a small neutral-white glow at runtime without recoloring the lunar surface.
+
+## Landing page
+
+The dependency-free landing page lives in [`website/`](website/). It uses the same ten moon-phase images and product screenshot as the desktop application. Run `./website/build.ps1` to create a local `website/dist/` directory and `website/QuotaWisp-landing.zip`.

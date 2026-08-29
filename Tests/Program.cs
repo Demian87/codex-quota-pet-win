@@ -35,6 +35,23 @@ var tests = new (string Name, Action Run)[]
         Equal("pack://application:,,,/Assets/quota-wisp.png", QuotaMoon.AssetUri(100));
         Equal("pack://application:,,,/Assets/quota-wisp-40.png", QuotaMoon.AssetUri(40));
     }),
+    ("replaced Codex connections reject stale callbacks", () =>
+    {
+        var gate = new ConnectionGenerationGate();
+        var first = gate.Advance();
+        True(gate.IsCurrent(first));
+        var second = gate.Advance();
+        True(!gate.IsCurrent(first)); True(gate.IsCurrent(second));
+        gate.Invalidate(second);
+        True(!gate.IsCurrent(second));
+    }),
+    ("transparent padding does not capture pointer input", () =>
+    {
+        var satellites = new[] { new System.Windows.Rect(10, 10, 20, 10) };
+        True(PetInputRegion.Contains(new System.Windows.Point(100, 100), new System.Windows.Point(100, 100), 50, satellites));
+        True(PetInputRegion.Contains(new System.Windows.Point(15, 15), new System.Windows.Point(100, 100), 50, satellites));
+        True(!PetInputRegion.Contains(new System.Windows.Point(5, 90), new System.Windows.Point(100, 100), 50, satellites));
+    }),
     ("quota history presents continuous burn", () =>
     {
         var now = new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);

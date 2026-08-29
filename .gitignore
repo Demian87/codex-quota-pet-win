@@ -8,6 +8,7 @@
 
 # Local SDK and package caches
 /.dotnet-cli/
+/.build/
 /.nuget/
 /packages/
 
@@ -32,6 +33,8 @@
 # Published artifacts: keep only the distributable ZIP archive
 /artifacts/*
 !/artifacts/QuotaWisp-win-x64.zip
+/website/dist/
+/website/QuotaWisp-landing.zip
 
 # Temporary and OS-generated files
 *.tmp

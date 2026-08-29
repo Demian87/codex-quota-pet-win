@@ -18,6 +18,7 @@
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <DebugType>embedded</DebugType>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;.build\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

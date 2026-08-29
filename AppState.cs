@@ -4,6 +4,7 @@ public sealed class AppState : IDisposable
 {
     private readonly SettingsStore _settingsStore = new();
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly ConnectionGenerationGate _connectionGeneration = new();
     private CodexAppServerClient? _client;
     private bool _started;
     private bool _historyGap = true;
@@ -44,13 +45,25 @@ public sealed class AppState : IDisposable
         while (!token.IsCancellationRequested)
         {
             SetConnection(attempt == 0 ? ConnectionStatus.Connecting : ConnectionStatus.Reconnecting, null);
+            var generation = _connectionGeneration.Advance();
+            EventHandler<QuotaSnapshot>? snapshotHandler = null;
+            EventHandler<SpeedMode>? speedModeHandler = null;
+            CodexAppServerClient? client = null;
             try
             {
                 _clientReceivedSnapshot = false;
-                using var client = new CodexAppServerClient();
+                client = new CodexAppServerClient();
                 _client = client;
-                client.SnapshotReceived += OnSnapshot;
-                client.SpeedModeReceived += OnSpeedMode;
+                snapshotHandler = (_, snapshot) =>
+                {
+                    if (_connectionGeneration.IsCurrent(generation)) OnSnapshot(client, snapshot);
+                };
+                speedModeHandler = (_, mode) =>
+                {
+                    if (_connectionGeneration.IsCurrent(generation)) OnSpeedMode(client, mode);
+                };
+                client.SnapshotReceived += snapshotHandler;
+                client.SpeedModeReceived += speedModeHandler;
                 await client.RunAsync(Settings.CodexPath, token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { break; }
@@ -59,7 +72,17 @@ public sealed class AppState : IDisposable
                 _historyGap = true;
                 SetConnection(ConnectionStatus.Reconnecting, error.Message);
             }
-            finally { _client = null; }
+            finally
+            {
+                _connectionGeneration.Invalidate(generation);
+                if (client is not null)
+                {
+                    if (snapshotHandler is not null) client.SnapshotReceived -= snapshotHandler;
+                    if (speedModeHandler is not null) client.SpeedModeReceived -= speedModeHandler;
+                    client.Dispose();
+                }
+                if (ReferenceEquals(_client, client)) _client = null;
+            }
             if (token.IsCancellationRequested) break;
             if (_clientReceivedSnapshot) attempt = 0;
             await Task.Delay(TimeSpan.FromSeconds(delays[Math.Min(attempt, delays.Length - 1)]), token);
@@ -124,6 +147,7 @@ public sealed class AppState : IDisposable
     public void SetCodexPath(string path)
     {
         Settings.CodexPath = path; SaveAndRaise();
+        _connectionGeneration.Advance();
         _client?.Dispose();
     }
 
@@ -144,6 +168,7 @@ public sealed class AppState : IDisposable
 
     public void Dispose()
     {
+        _connectionGeneration.Advance();
         _lifetime.Cancel(); _client?.Dispose(); _lifetime.Dispose();
     }
 }

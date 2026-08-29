@@ -34,7 +34,7 @@
             </Setter>
         </Style>
     </Window.Resources>
-    <Grid x:Name="Root" Background="Transparent">
+    <Grid x:Name="Root">
         <Canvas x:Name="EffectsCanvas" IsHitTestVisible="False" />
         <Grid x:Name="PetSurface" Width="300" Height="300"
               HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -55,7 +55,6 @@
                     <Rectangle Width="11" Height="8" Canvas.Left="25" Canvas.Top="8.5" Fill="#FF2778D8" Stroke="#FF72D7FF" StrokeThickness="1" />
                     <Line X1="18" Y1="8" X2="18" Y2="3" Stroke="#FFDDEBFF" StrokeThickness="1.5" />
                     <Ellipse Width="3" Height="3" Canvas.Left="16.5" Canvas.Top="0" Fill="#FFFFC65C" />
-                    <Canvas.Effect><DropShadowEffect Color="#FF31DFFF" BlurRadius="7" ShadowDepth="0" /></Canvas.Effect>
                 </Canvas>
                 <Canvas x:Name="SatelliteRight" Width="34" Height="26" Canvas.Left="242" Canvas.Top="110"
                         RenderTransformOrigin="0.5,0.5">
@@ -71,7 +70,6 @@
                     <Rectangle Width="10" Height="8" Canvas.Left="24" Canvas.Top="9" Fill="#FF654CCB" Stroke="#FFC0AEFF" StrokeThickness="1" />
                     <Line X1="17" Y1="8" X2="21" Y2="3" Stroke="#FFE6E0FF" StrokeThickness="1.5" />
                     <Ellipse Width="4" Height="4" Canvas.Left="20" Canvas.Top="0" Fill="#FFFFC65C" />
-                    <Canvas.Effect><DropShadowEffect Color="#FF9474FF" BlurRadius="7" ShadowDepth="0" /></Canvas.Effect>
                 </Canvas>
                 <Canvas x:Name="SatelliteTop" Width="28" Height="31" Canvas.Left="144" Canvas.Top="23"
                         RenderTransformOrigin="0.5,0.5">
@@ -82,12 +80,14 @@
                     <Rectangle Width="8" Height="10" Canvas.Left="20" Canvas.Top="11" Fill="#FF2A83B8" Stroke="#FF74DBF5" StrokeThickness="1" />
                     <Line X1="14" Y1="11" X2="14" Y2="5" Stroke="#FFE5F7FF" StrokeThickness="1.5" />
                     <Path Data="M 9,5 Q 14,0 19,5" Stroke="#FFE5F7FF" StrokeThickness="1.5" Fill="Transparent" />
-                    <Canvas.Effect><DropShadowEffect Color="#FF52D4FF" BlurRadius="7" ShadowDepth="0" /></Canvas.Effect>
                 </Canvas>
             </Canvas>
             <Image x:Name="WispImage" Source="Assets/quota-wisp.png" Width="176" Height="176"
                    Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
                    AutomationProperties.Name="Lunar Codex quota pet">
+                <Image.Effect>
+                    <DropShadowEffect Color="#FFFFFFFF" BlurRadius="9" ShadowDepth="0" Opacity="0.3" />
+                </Image.Effect>
                 <Image.RenderTransform>
                     <TransformGroup>
                         <ScaleTransform x:Name="WispScale" ScaleX="1" ScaleY="1" />

@@ -22,7 +22,9 @@ public partial class MainWindow : Window
     private readonly Random _random = new();
     private Point _pointerStart, _windowStart;
     private bool _dragging, _fullscreenSuppressed;
+    private bool? _nativeClickThrough;
     private double _phase;
+    private PetSize? _appliedSize;
     private int _quotaImageBucket = 100;
     private static readonly Dictionary<int, BitmapImage> QuotaImages = [];
 
@@ -53,6 +55,7 @@ public partial class MainWindow : Window
 
     private void Animate(object? sender, EventArgs e)
     {
+        UpdatePointerTransparency();
         if (!SystemParameters.ClientAreaAnimation)
         { OrbitRotate.Angle = 0; WispBob.Y = 0; WispScale.ScaleX = WispScale.ScaleY = 1; return; }
         var remaining = _state.Quota?.Primary?.RemainingPercent ?? 50;
@@ -65,6 +68,7 @@ public partial class MainWindow : Window
 
     private void ApplySize()
     {
+        var sizeChanged = _appliedSize != _state.Settings.PetSize;
         var layout = PetLayout.For(_state.Settings.PetSize);
         Width = layout.WindowWidth; Height = layout.WindowHeight;
         PetSurface.Width = PetSurface.Height = layout.OrbitSize;
@@ -76,7 +80,17 @@ public partial class MainWindow : Window
         PlaceSatellite(SatelliteLeft, layout, 180);
         PlaceSatellite(SatelliteRight, layout, -14);
         PlaceSatellite(SatelliteTop, layout, -86);
-        if (IsLoaded) ClampToScreens();
+        _appliedSize = _state.Settings.PetSize;
+        if (IsLoaded && sizeChanged) ClampToScreens();
+    }
+
+    private bool IsVisiblePetPoint(Point point)
+    {
+        var layout = PetLayout.For(_state.Settings.PetSize);
+        var center = new Point(ActualWidth / 2, ActualHeight / 2);
+        var satellites = new[] { SatelliteLeft, SatelliteRight, SatelliteTop }.Select(satellite =>
+            satellite.TransformToAncestor(this).TransformBounds(new Rect(0, 0, satellite.ActualWidth, satellite.ActualHeight)));
+        return PetInputRegion.Contains(point, center, layout.MoonSize / 2, satellites);
     }
 
     private static void PlaceSatellite(Canvas satellite, PetLayout layout, double angle)
@@ -151,7 +165,17 @@ public partial class MainWindow : Window
     private void Pet_MouseEnter(object sender, MouseEventArgs e) => _ = _state.RefreshAsync();
     private void Pet_MouseLeave(object sender, MouseEventArgs e) { }
 
-    private void ApplyClickThrough() { if (IsLoaded) Win32.SetClickThrough(this, _state.Settings.ClickThrough); }
+    private void ApplyClickThrough() { if (IsLoaded) UpdatePointerTransparency(force: true); }
+    private void UpdatePointerTransparency(bool force = false)
+    {
+        if (!IsLoaded) return;
+        var cursor = System.Windows.Forms.Cursor.Position;
+        var point = PointFromScreen(new Point(cursor.X, cursor.Y));
+        var enabled = _state.Settings.ClickThrough || !IsVisiblePetPoint(point);
+        if (!force && _nativeClickThrough == enabled) return;
+        Win32.SetClickThrough(this, enabled);
+        _nativeClickThrough = enabled;
+    }
     private void CheckFullscreen()
     {
         _fullscreenSuppressed = _state.Settings.HideInFullscreen && Win32.IsForegroundFullscreen(new WindowInteropHelper(this).Handle);

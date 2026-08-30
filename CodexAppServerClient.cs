@@ -1,11 +1,17 @@
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 
 namespace QuotaWisp;
 
 public sealed class CodexAppServerClient : IDisposable
 {
+    private static readonly string ClientVersion =
+        typeof(CodexAppServerClient).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion.Split('+')[0] ?? "1.0.0";
+
     private Process? _process;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private int _requestId;
@@ -29,7 +35,7 @@ public sealed class CodexAppServerClient : IDisposable
         try
         {
             await SendAsync(new { method = "initialize", id = 0, @params = new {
-                clientInfo = new { name = "quota_wisp_windows", title = "Quota Wisp", version = "1.0.0" }
+                clientInfo = new { name = "quota_wisp_windows", title = "Quota Wisp", version = ClientVersion }
             } });
             await SendAsync(new { method = "initialized", @params = new { } });
             await RequestRateLimitsAsync();

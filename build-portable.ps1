@@ -1,5 +1,11 @@
-param([string]$Configuration = "Release")
+param(
+    [string]$Configuration = "Release",
+    [string]$Version = "1.0.0"
+)
 $ErrorActionPreference = "Stop"
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+    throw "Version must be a semantic version such as 1.2.3 or 1.2.3-beta.1."
+}
 $projectRoot = $PSScriptRoot
 $dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
 if (-not $dotnet) { $dotnet = "C:\Program Files\dotnet\dotnet.exe" }
@@ -12,10 +18,10 @@ $buildIntermediate = Join-Path $buildRoot "obj\"
 $publish = Join-Path $projectRoot "artifacts\portable"
 $zip = Join-Path $projectRoot "artifacts\QuotaWisp-win-x64.zip"
 & $dotnet restore (Join-Path $projectRoot "QuotaWisp.csproj") --runtime win-x64 --configfile (Join-Path $projectRoot "NuGet.Config") `
-    -p:BaseOutputPath=$buildOutput -p:BaseIntermediateOutputPath=$buildIntermediate
+    -p:Version=$Version -p:BaseOutputPath=$buildOutput -p:BaseIntermediateOutputPath=$buildIntermediate
 if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed." }
 & $dotnet publish (Join-Path $projectRoot "QuotaWisp.csproj") --configuration $Configuration --runtime win-x64 --self-contained true --output $publish --no-restore `
-    -p:BaseOutputPath=$buildOutput -p:BaseIntermediateOutputPath=$buildIntermediate
+    -p:Version=$Version -p:BaseOutputPath=$buildOutput -p:BaseIntermediateOutputPath=$buildIntermediate
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
 Compress-Archive -Path (Join-Path $publish "*") -DestinationPath $zip -CompressionLevel Optimal

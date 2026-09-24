@@ -10,7 +10,7 @@ public sealed class CodexAppServerClient : IDisposable
     private static readonly string ClientVersion =
         typeof(CodexAppServerClient).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion.Split('+')[0] ?? "1.0.0";
+            .InformationalVersion.Split('+')[0] ?? "1.5.0";
 
     private Process? _process;
     private readonly SemaphoreSlim _writeLock = new(1, 1);

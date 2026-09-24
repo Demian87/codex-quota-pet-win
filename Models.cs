@@ -9,6 +9,45 @@ public sealed record QuotaWindow(int UsedPercent, long? WindowDurationMinutes, l
 }
 
 public sealed record QuotaSnapshot(string? PlanType, QuotaWindow? Primary, QuotaWindow? Secondary);
+public sealed record ResetCreditsUpdate(int? AvailableCount);
+
+public sealed class ConnectionResetCredits
+{
+    private long _generation;
+
+    public int? AvailableCount { get; private set; }
+
+    public bool Begin(long generation)
+    {
+        _generation = generation;
+        return Set(null);
+    }
+
+    public bool Update(long generation, int? availableCount) =>
+        generation == _generation && Set(availableCount is { } count ? Math.Max(0, count) : null);
+
+    public bool End(long generation) => generation == _generation && Set(null);
+
+    public bool Clear() => Set(null);
+
+    private bool Set(int? value)
+    {
+        if (AvailableCount == value) return false;
+        AvailableCount = value;
+        return true;
+    }
+}
+
+public static class ResetCreditsFormatter
+{
+    public static string? Format(int? availableCount) => availableCount switch
+    {
+        null or <= 0 => null,
+        > 99 => "99+",
+        _ => availableCount.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+    };
+}
+
 public enum ConnectionStatus { Connecting, Connected, Reconnecting, Disconnected }
 public enum SpeedMode { Standard, Turbo }
 public enum PetSize { Small, Medium, Large }

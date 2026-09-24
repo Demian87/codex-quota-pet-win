@@ -135,6 +135,10 @@ public partial class MainWindow : Window
         SecondaryLabel.Text = L.T("weekly"); SecondaryPercent.Text = secondary is null ? "—" : $"{secondary.RemainingPercent}%";
         SecondaryReset.Text = secondary is null ? "" : $"{L.T("reset")}: {FormatReset(secondary.ResetTime)}";
         SecondaryPanel.Visibility = SecondarySeparator.Visibility = SecondaryReset.Visibility = secondary is null ? Visibility.Collapsed : Visibility.Visible;
+        var resetCredits = ResetCreditsFormatter.Format(_state.ResetCreditsAvailableCount);
+        ResetCreditsLabel.Text = L.T("resetcredits");
+        ResetCreditsCount.Text = resetCredits ?? "";
+        ResetCreditsPanel.Visibility = resetCredits is null ? Visibility.Collapsed : Visibility.Visible;
         HistoryPanel.Visibility = _state.Settings.ShowHistory ? Visibility.Visible : Visibility.Collapsed;
         HistoryLabel.Text = L.T("historytitle");
         var history = _state.History.Presentation();

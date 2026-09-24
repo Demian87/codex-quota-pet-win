@@ -16,6 +16,42 @@ var tests = new (string Name, Action Run)[]
         using var json = JsonDocument.Parse("""{"rateLimits":{"primary":{"usedPercent":1}},"rateLimitsByLimitId":{"codex":{"primary":{"usedPercent":80}}}}""");
         True(CodexAppServerClient.TryParseRateLimits(json.RootElement, out var result)); Equal(20, result.Primary?.RemainingPercent);
     }),
+    ("manual reset credits decode direct and enveloped payloads", () =>
+    {
+        using var direct = JsonDocument.Parse("""{"rateLimits":{},"rateLimitResetCredits":{"availableCount":7}}""");
+        True(CodexAppServerClient.TryParseResetCredits(direct.RootElement, out var directCount));
+        Equal(7, directCount);
+        using var enveloped = JsonDocument.Parse("""{"result":{"data":{"rateLimitResetCredits":{"availableCount":123}}}}""");
+        True(CodexAppServerClient.TryParseResetCredits(enveloped.RootElement, out var envelopeCount));
+        Equal(123, envelopeCount);
+        using var fullEnvelope = JsonDocument.Parse("""{"data":{"rateLimits":{"primary":{"usedPercent":25}},"rateLimitResetCredits":{"availableCount":4}}}""");
+        True(CodexAppServerClient.TryParseRateLimits(fullEnvelope.RootElement, out var envelopeQuota));
+        Equal(75, envelopeQuota.Primary?.RemainingPercent);
+        using var absent = JsonDocument.Parse("""{"rateLimits":{}}""");
+        True(!CodexAppServerClient.TryParseResetCredits(absent.RootElement, out _));
+    }),
+    ("manual reset credits clamp and format", () =>
+    {
+        using var negative = JsonDocument.Parse("""{"rateLimitResetCredits":{"availableCount":-4}}""");
+        True(CodexAppServerClient.TryParseResetCredits(negative.RootElement, out var clamped));
+        Equal(0, clamped);
+        Equal<string?>(null, ResetCreditsFormatter.Format(null));
+        Equal<string?>(null, ResetCreditsFormatter.Format(0));
+        Equal("1", ResetCreditsFormatter.Format(1));
+        Equal("99", ResetCreditsFormatter.Format(99));
+        Equal("99+", ResetCreditsFormatter.Format(100));
+    }),
+    ("manual reset credits are scoped to current connection", () =>
+    {
+        var credits = new ConnectionResetCredits();
+        True(!credits.Begin(10));
+        True(credits.Update(10, 8)); Equal<int?>(8, credits.AvailableCount);
+        True(credits.Begin(11)); Equal<int?>(null, credits.AvailableCount);
+        True(!credits.Update(10, 50)); Equal<int?>(null, credits.AvailableCount);
+        True(credits.Update(11, 120)); Equal<int?>(120, credits.AvailableCount);
+        True(!credits.End(10)); Equal<int?>(120, credits.AvailableCount);
+        True(credits.End(11)); Equal<int?>(null, credits.AvailableCount);
+    }),
     ("cmd launcher is non-interactive", () =>
     {
         var info = CodexLocator.CreateStartInfo(@"C:\tools\codex.cmd");
@@ -24,8 +60,8 @@ var tests = new (string Name, Action Run)[]
     }),
     ("localization switches deterministically", () =>
     {
-        L.SetLanguage(UiLanguage.Russian); Equal("Выход", L.T("quit"));
-        L.SetLanguage(UiLanguage.English); Equal("Quit", L.T("quit"));
+        L.SetLanguage(UiLanguage.Russian); Equal("Выход", L.T("quit")); Equal("РУЧНЫЕ СБРОСЫ", L.T("resetcredits"));
+        L.SetLanguage(UiLanguage.English); Equal("Quit", L.T("quit")); Equal("MANUAL RESETS", L.T("resetcredits"));
     }),
     ("quota moon uses ten-percent buckets", () =>
     {

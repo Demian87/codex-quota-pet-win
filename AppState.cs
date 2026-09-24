@@ -5,6 +5,7 @@ public sealed class AppState : IDisposable
     private readonly SettingsStore _settingsStore = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly ConnectionGenerationGate _connectionGeneration = new();
+    private readonly ConnectionResetCredits _resetCredits = new();
     private CodexAppServerClient? _client;
     private bool _started;
     private bool _historyGap = true;
@@ -17,6 +18,7 @@ public sealed class AppState : IDisposable
     public SpeedMode SpeedMode { get; private set; } = SpeedMode.Standard;
     public ConnectionStatus Connection { get; private set; } = ConnectionStatus.Connecting;
     public string? LastError { get; private set; }
+    public int? ResetCreditsAvailableCount => _resetCredits.AvailableCount;
 
     public event EventHandler? Changed;
     public event EventHandler? TrayRefreshRequested;
@@ -48,10 +50,12 @@ public sealed class AppState : IDisposable
             var generation = _connectionGeneration.Advance();
             EventHandler<QuotaSnapshot>? snapshotHandler = null;
             EventHandler<SpeedMode>? speedModeHandler = null;
+            EventHandler<ResetCreditsUpdate>? resetCreditsHandler = null;
             CodexAppServerClient? client = null;
             try
             {
                 _clientReceivedSnapshot = false;
+                if (_resetCredits.Begin(generation)) RaiseChanged();
                 client = new CodexAppServerClient();
                 _client = client;
                 snapshotHandler = (_, snapshot) =>
@@ -62,8 +66,14 @@ public sealed class AppState : IDisposable
                 {
                     if (_connectionGeneration.IsCurrent(generation)) OnSpeedMode(client, mode);
                 };
+                resetCreditsHandler = (_, update) =>
+                {
+                    if (_connectionGeneration.IsCurrent(generation) &&
+                        _resetCredits.Update(generation, update.AvailableCount)) RaiseChanged();
+                };
                 client.SnapshotReceived += snapshotHandler;
                 client.SpeedModeReceived += speedModeHandler;
+                client.ResetCreditsReceived += resetCreditsHandler;
                 await client.RunAsync(Settings.CodexPath, token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { break; }
@@ -75,10 +85,12 @@ public sealed class AppState : IDisposable
             finally
             {
                 _connectionGeneration.Invalidate(generation);
+                if (_resetCredits.End(generation)) RaiseChanged();
                 if (client is not null)
                 {
                     if (snapshotHandler is not null) client.SnapshotReceived -= snapshotHandler;
                     if (speedModeHandler is not null) client.SpeedModeReceived -= speedModeHandler;
+                    if (resetCreditsHandler is not null) client.ResetCreditsReceived -= resetCreditsHandler;
                     client.Dispose();
                 }
                 if (ReferenceEquals(_client, client)) _client = null;
@@ -148,6 +160,7 @@ public sealed class AppState : IDisposable
     {
         Settings.CodexPath = path; SaveAndRaise();
         _connectionGeneration.Advance();
+        if (_resetCredits.Clear()) RaiseChanged();
         _client?.Dispose();
     }
 
@@ -169,6 +182,7 @@ public sealed class AppState : IDisposable
     public void Dispose()
     {
         _connectionGeneration.Advance();
+        _resetCredits.Clear();
         _lifetime.Cancel(); _client?.Dispose(); _lifetime.Dispose();
     }
 }

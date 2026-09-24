@@ -14,6 +14,7 @@ public static class L
         ["app"] = ("Quota Wisp", "Квота-Огонёк"),
         ["available"] = ("AVAILABLE", "ДОСТУПНО"),
         ["weekly"] = ("Weekly", "Недельный"),
+        ["resetcredits"] = ("MANUAL RESETS", "РУЧНЫЕ СБРОСЫ"),
         ["reset"] = ("Reset", "Сброс"),
         ["standard"] = ("STANDARD", "ОБЫЧНЫЙ"), ["turbo"] = ("TURBO", "ТУРБО"),
         ["connecting"] = ("Connecting to Codex…", "Подключение к Codex…"),

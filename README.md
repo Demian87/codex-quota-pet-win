@@ -6,7 +6,7 @@ An original, local-only Windows 11 desktop pet that shows Codex quota. For the m
 
 - Transparent always-on-top WPF pet with an original animated moon-and-satellites image.
 - Primary and secondary quota, reset time, Standard/Turbo mode.
-- Local Codex App Server JSON-RPC; no telemetry and no remote service.
+- Local Codex App Server JSON-RPC; no telemetry. Network access occurs only when the user explicitly checks for an update.
 - Automatic reconnect, event refresh, 60-second polling and hover refresh.
 - Stale callbacks from replaced Codex connections are discarded.
 - Smooth and pixel tooltip styles, English and Russian UI.
@@ -14,6 +14,7 @@ An original, local-only Windows 11 desktop pet that shows Codex quota. For the m
 - Transparent window padding passes pointer input to applications underneath.
 - Optional visibility only while Codex is active, fullscreen hiding and user-level Windows startup.
 - 30-day local quota history, consumption reactions and weighted interactive objects.
+- Manual, opt-in update check through GitHub Releases; there are no background update checks.
 
 ## Tooltip preview
 
@@ -53,6 +54,12 @@ Quota Wisp looks for `codex.exe`, `codex.cmd`, or `codex.ps1` in standard locati
 Settings and history are stored under `%LOCALAPPDATA%\QuotaWisp`. Enabling startup adds the current executable to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 
 The optional **Behavior → Show only while Codex is active** mode recognizes the Codex desktop process directly. For Codex CLI it checks whether `codex.exe` is a descendant of the foreground PowerShell, Command Prompt, Windows Terminal or another supported terminal host; a terminal title containing `Codex` is used as a fallback for pseudoconsole layouts whose process tree is not exposed to the terminal window. Manual hiding always wins, followed by fullscreen suppression, then this foreground-app rule. The setting is saved locally and disabled by default.
+
+## Manual updates
+
+Choose **Check for updates…** in the tray menu to query the latest GitHub Release. Quota Wisp never checks in the background. Before installation it downloads both `QuotaWisp-win-x64.zip` and its `.sha256` companion, requires an exact SHA-256 match, rejects unsafe ZIP paths and asks for confirmation. It then flushes local quota history; a save error or timeout cancels installation and leaves the running application open.
+
+Installation is performed by a temporary copy of Quota Wisp only after the main process exits. Existing files are backed up during replacement, restored if replacement fails, and the application is restarted. The updater does not request elevation, bypass SmartScreen, change Defender settings, or weaken Windows security. SHA-256 detects a corrupted or mismatched download but is not a substitute for publisher signing; releases remain unsigned until a code-signing certificate is configured.
 
 ## Build and verify
 

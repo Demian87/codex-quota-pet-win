@@ -11,6 +11,7 @@ public sealed class TrayService : IDisposable
     private bool _menuOpen;
     private bool _menuRefreshPending;
     private bool _disposed;
+    private bool _checkingForUpdates;
 
     public TrayService(AppState state, MainWindow window)
     {
@@ -95,6 +96,8 @@ public sealed class TrayService : IDisposable
         AddCheck(behavior, L.T("autostart"), _state.Settings.LaunchAtLogin, () => _state.SetAutoStart(!_state.Settings.LaunchAtLogin));
         Add(behavior, L.T("codexpath"), SelectCodexPath);
         menu.Items.Add(behavior);
+
+        Add(menu, _checkingForUpdates ? L.T("updatechecking") : L.T("checkupdates"), CheckForUpdates, !_checkingForUpdates);
         menu.Items.Add(new Forms.ToolStripSeparator());
         Add(menu, L.T("quit"), () => System.Windows.Application.Current.Shutdown());
 
@@ -117,6 +120,51 @@ public sealed class TrayService : IDisposable
             Title = L.T("codexpath"), Filter = "Codex executable|codex.exe;codex.cmd;codex.ps1|All files|*.*"
         };
         if (dialog.ShowDialog() == true) _state.SetCodexPath(dialog.FileName);
+    }
+
+    private async void CheckForUpdates()
+    {
+        if (_checkingForUpdates || _disposed) return;
+        _checkingForUpdates = true;
+        RequestMenuRefresh();
+        UpdatePackage? package = null;
+        try
+        {
+            using var manager = new UpdateManager();
+            var release = await manager.CheckAsync(CancellationToken.None);
+            if (release is null)
+            {
+                System.Windows.MessageBox.Show(string.Format(L.T("updatecurrent"), UpdateManager.CurrentVersion),
+                    L.T("updatetitle"), System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                return;
+            }
+            if (System.Windows.MessageBox.Show(string.Format(L.T("updateavailable"), release.Version, UpdateManager.CurrentVersion),
+                    L.T("updatetitle"), System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question) != System.Windows.MessageBoxResult.Yes)
+                return;
+
+            package = await manager.DownloadAndVerifyAsync(release, CancellationToken.None);
+            if (System.Windows.MessageBox.Show(L.T("updateready"), L.T("updatetitle"),
+                    System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question) != System.Windows.MessageBoxResult.Yes)
+            {
+                package.Delete();
+                return;
+            }
+
+            await _state.FlushHistoryForUpdateAsync(TimeSpan.FromSeconds(10));
+            manager.StartInstaller(package);
+            System.Windows.Application.Current.Shutdown();
+        }
+        catch (Exception error)
+        {
+            package?.Delete();
+            System.Windows.MessageBox.Show(string.Format(L.T("updateerror"), error.Message), L.T("updatetitle"),
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+        }
+        finally
+        {
+            _checkingForUpdates = false;
+            RequestMenuRefresh();
+        }
     }
 
     public void ShowNotification(string message)

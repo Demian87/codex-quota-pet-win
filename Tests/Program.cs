@@ -151,6 +151,58 @@ var tests = new (string Name, Action Run)[]
             True(layout.OrbitRadius + satelliteHalfDiagonal < layout.OrbitSize / 2);
             True(layout.WindowHeight > layout.OrbitSize);
         }
+    }),
+    ("semantic versions follow release precedence", () =>
+    {
+        True(SemanticVersion.TryParse("v1.2.3", out var stable));
+        True(SemanticVersion.TryParse("1.2.3-rc.2+build.7", out var candidate));
+        True(SemanticVersion.TryParse("1.2.3-rc.10", out var laterCandidate));
+        True(stable.CompareTo(candidate) > 0);
+        True(laterCandidate.CompareTo(candidate) > 0);
+        True(!SemanticVersion.TryParse("1.02.3", out _));
+    }),
+    ("release checksum is strict and file-bound", () =>
+    {
+        var hash = new string('a', 64);
+        Equal(hash.ToUpperInvariant(), UpdateManager.ParseChecksum($"{hash}  QuotaWisp-win-x64.zip\n", "QuotaWisp-win-x64.zip"));
+        Throws<InvalidDataException>(() => UpdateManager.ParseChecksum($"{hash}  another.zip", "QuotaWisp-win-x64.zip"));
+        Throws<InvalidDataException>(() => UpdateManager.ParseChecksum($"{hash}  QuotaWisp-win-x64.zip\n{hash}  QuotaWisp-win-x64.zip", "QuotaWisp-win-x64.zip"));
+    }),
+    ("update archives reject zip slip", () =>
+    {
+        var root = Path.Combine(Path.GetTempPath(), "QuotaWispSelfTest-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var archivePath = Path.Combine(root, "bad.zip");
+            using (var archive = System.IO.Compression.ZipFile.Open(archivePath, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                using var writer = new StreamWriter(archive.CreateEntry("../outside.txt").Open());
+                writer.Write("not allowed");
+            }
+            Throws<InvalidDataException>(() => SafeZipExtractor.Extract(archivePath, Path.Combine(root, "payload")));
+            True(!File.Exists(Path.Combine(root, "outside.txt")));
+        }
+        finally { Directory.Delete(root, true); }
+    }),
+    ("update installer replaces payload files", () =>
+    {
+        var root = Path.Combine(Path.GetTempPath(), "QuotaWispInstallTest-" + Guid.NewGuid().ToString("N"));
+        var payload = Path.Combine(root, "payload");
+        var install = Path.Combine(root, "install");
+        Directory.CreateDirectory(Path.Combine(payload, "data"));
+        Directory.CreateDirectory(install);
+        try
+        {
+            File.WriteAllText(Path.Combine(install, "QuotaWisp.exe"), "old");
+            File.WriteAllText(Path.Combine(payload, "QuotaWisp.exe"), "new");
+            File.WriteAllText(Path.Combine(payload, "data", "version.txt"), "1.2.3");
+            UpdateBootstrapper.InstallWithRollback(payload, install);
+            Equal("new", File.ReadAllText(Path.Combine(install, "QuotaWisp.exe")));
+            Equal("1.2.3", File.ReadAllText(Path.Combine(install, "data", "version.txt")));
+            True(!Directory.GetDirectories(install, ".quotawisp-rollback-*", SearchOption.TopDirectoryOnly).Any());
+        }
+        finally { Directory.Delete(root, true); }
     })
 };
 
@@ -180,3 +232,9 @@ return failures == 0 ? 0 : 1;
 static void True(bool value) { if (!value) throw new InvalidOperationException("Expected true."); }
 static void Equal<T>(T expected, T actual)
 { if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new InvalidOperationException($"Expected {expected}, got {actual}."); }
+static void Throws<T>(Action action) where T : Exception
+{
+    try { action(); }
+    catch (T) { return; }
+    throw new InvalidOperationException($"Expected {typeof(T).Name}.");
+}

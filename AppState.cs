@@ -178,6 +178,11 @@ public sealed class AppState : IDisposable
     }
 
     public void ClearHistory() { History.Clear(); RaiseChanged(); }
+    public async Task FlushHistoryForUpdateAsync(TimeSpan timeout)
+    {
+        using var timeoutSource = new CancellationTokenSource(timeout);
+        await History.FlushAsync(timeoutSource.Token).WaitAsync(timeout, timeoutSource.Token);
+    }
     private void SaveAndRaise() { _settingsStore.Save(Settings); RaiseChanged(); }
 
     public void Dispose()

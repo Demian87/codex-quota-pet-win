@@ -5,37 +5,52 @@ namespace QuotaWisp;
 
 public sealed class QuotaHistoryStore
 {
+    private readonly object _sync = new();
     private readonly string _path = Path.Combine(SettingsStore.DataDirectory, "quota-history-v1.json");
     private readonly List<HistorySample> _samples = [];
     private static readonly TimeSpan Retention = TimeSpan.FromDays(30);
     private static readonly TimeSpan Heartbeat = TimeSpan.FromHours(1);
-    public IReadOnlyList<HistorySample> Samples => _samples;
+    public IReadOnlyList<HistorySample> Samples { get { lock (_sync) return _samples.ToArray(); } }
 
     public void Load()
     {
-        try
+        lock (_sync)
         {
-            if (File.Exists(_path))
-                _samples.AddRange(JsonSerializer.Deserialize<List<HistorySample>>(File.ReadAllText(_path)) ?? []);
+            try
+            {
+                if (File.Exists(_path))
+                    _samples.AddRange(JsonSerializer.Deserialize<List<HistorySample>>(File.ReadAllText(_path)) ?? []);
+            }
+            catch { }
+            Prune();
         }
-        catch { }
-        Prune();
     }
 
     public void Add(QuotaSnapshot snapshot, bool gap)
     {
         if (snapshot.Primary is not { } primary) return;
-        var sample = new HistorySample(DateTimeOffset.Now, primary.RemainingPercent, primary.ResetsAt, gap);
-        if (_samples.LastOrDefault() is { } last && !gap && last.RemainingPercent == sample.RemainingPercent &&
-            last.ResetsAt == sample.ResetsAt && sample.ObservedAt - last.ObservedAt < Heartbeat) return;
-        _samples.Add(sample);
-        Prune(); Persist();
+        lock (_sync)
+        {
+            var sample = new HistorySample(DateTimeOffset.Now, primary.RemainingPercent, primary.ResetsAt, gap);
+            if (_samples.LastOrDefault() is { } last && !gap && last.RemainingPercent == sample.RemainingPercent &&
+                last.ResetsAt == sample.ResetsAt && sample.ObservedAt - last.ObservedAt < Heartbeat) return;
+            _samples.Add(sample);
+            Prune(); Persist();
+        }
     }
 
-    public void Clear() { _samples.Clear(); Persist(); }
+    public void Clear() { lock (_sync) { _samples.Clear(); Persist(); } }
 
-    public QuotaHistoryPresentation Presentation(DateTimeOffset? now = null) =>
-        QuotaHistoryPresentation.Create(_samples, now ?? DateTimeOffset.Now);
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.Run(() =>
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_sync) Persist();
+    }, cancellationToken);
+
+    public QuotaHistoryPresentation Presentation(DateTimeOffset? now = null)
+    {
+        lock (_sync) return QuotaHistoryPresentation.Create(_samples.ToArray(), now ?? DateTimeOffset.Now);
+    }
 
     private void Prune()
     {

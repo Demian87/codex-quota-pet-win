@@ -16,6 +16,42 @@ var tests = new (string Name, Action Run)[]
         using var json = JsonDocument.Parse("""{"rateLimits":{"primary":{"usedPercent":1}},"rateLimitsByLimitId":{"codex":{"primary":{"usedPercent":80}}}}""");
         True(CodexAppServerClient.TryParseRateLimits(json.RootElement, out var result)); Equal(20, result.Primary?.RemainingPercent);
     }),
+    ("manual reset credits decode direct and enveloped payloads", () =>
+    {
+        using var direct = JsonDocument.Parse("""{"rateLimits":{},"rateLimitResetCredits":{"availableCount":7}}""");
+        True(CodexAppServerClient.TryParseResetCredits(direct.RootElement, out var directCount));
+        Equal(7, directCount);
+        using var enveloped = JsonDocument.Parse("""{"result":{"data":{"rateLimitResetCredits":{"availableCount":123}}}}""");
+        True(CodexAppServerClient.TryParseResetCredits(enveloped.RootElement, out var envelopeCount));
+        Equal(123, envelopeCount);
+        using var fullEnvelope = JsonDocument.Parse("""{"data":{"rateLimits":{"primary":{"usedPercent":25}},"rateLimitResetCredits":{"availableCount":4}}}""");
+        True(CodexAppServerClient.TryParseRateLimits(fullEnvelope.RootElement, out var envelopeQuota));
+        Equal(75, envelopeQuota.Primary?.RemainingPercent);
+        using var absent = JsonDocument.Parse("""{"rateLimits":{}}""");
+        True(!CodexAppServerClient.TryParseResetCredits(absent.RootElement, out _));
+    }),
+    ("manual reset credits clamp and format", () =>
+    {
+        using var negative = JsonDocument.Parse("""{"rateLimitResetCredits":{"availableCount":-4}}""");
+        True(CodexAppServerClient.TryParseResetCredits(negative.RootElement, out var clamped));
+        Equal(0, clamped);
+        Equal<string?>(null, ResetCreditsFormatter.Format(null));
+        Equal<string?>(null, ResetCreditsFormatter.Format(0));
+        Equal("1", ResetCreditsFormatter.Format(1));
+        Equal("99", ResetCreditsFormatter.Format(99));
+        Equal("99+", ResetCreditsFormatter.Format(100));
+    }),
+    ("manual reset credits are scoped to current connection", () =>
+    {
+        var credits = new ConnectionResetCredits();
+        True(!credits.Begin(10));
+        True(credits.Update(10, 8)); Equal<int?>(8, credits.AvailableCount);
+        True(credits.Begin(11)); Equal<int?>(null, credits.AvailableCount);
+        True(!credits.Update(10, 50)); Equal<int?>(null, credits.AvailableCount);
+        True(credits.Update(11, 120)); Equal<int?>(120, credits.AvailableCount);
+        True(!credits.End(10)); Equal<int?>(120, credits.AvailableCount);
+        True(credits.End(11)); Equal<int?>(null, credits.AvailableCount);
+    }),
     ("cmd launcher is non-interactive", () =>
     {
         var info = CodexLocator.CreateStartInfo(@"C:\tools\codex.cmd");
@@ -24,8 +60,8 @@ var tests = new (string Name, Action Run)[]
     }),
     ("localization switches deterministically", () =>
     {
-        L.SetLanguage(UiLanguage.Russian); Equal("Выход", L.T("quit"));
-        L.SetLanguage(UiLanguage.English); Equal("Quit", L.T("quit"));
+        L.SetLanguage(UiLanguage.Russian); Equal("Выход", L.T("quit")); Equal("РУЧНЫЕ СБРОСЫ", L.T("resetcredits"));
+        L.SetLanguage(UiLanguage.English); Equal("Quit", L.T("quit")); Equal("MANUAL RESETS", L.T("resetcredits"));
     }),
     ("quota moon uses ten-percent buckets", () =>
     {
@@ -51,6 +87,35 @@ var tests = new (string Name, Action Run)[]
         True(PetInputRegion.Contains(new System.Windows.Point(100, 100), new System.Windows.Point(100, 100), 50, satellites));
         True(PetInputRegion.Contains(new System.Windows.Point(15, 15), new System.Windows.Point(100, 100), 50, satellites));
         True(!PetInputRegion.Contains(new System.Windows.Point(5, 90), new System.Windows.Point(100, 100), 50, satellites));
+    }),
+    ("pet visibility respects manual fullscreen and active-Codex suppression", () =>
+    {
+        True(PetVisibilityPolicy.ShouldShow(true, false, false, false));
+        True(!PetVisibilityPolicy.ShouldShow(false, false, false, true));
+        True(!PetVisibilityPolicy.ShouldShow(true, true, false, true));
+        True(!PetVisibilityPolicy.ShouldShow(true, false, true, false));
+        True(PetVisibilityPolicy.ShouldShow(true, false, true, true));
+    }),
+    ("Codex desktop and terminal child processes count as active", () =>
+    {
+        True(CodexForegroundDetector.IsCodexForeground(10, "Codex.exe", "", Array.Empty<ProcessTreeEntry>()));
+        var terminalTree = new[]
+        {
+            new ProcessTreeEntry(20, 10, "OpenConsole.exe"),
+            new ProcessTreeEntry(30, 20, "pwsh.exe"),
+            new ProcessTreeEntry(40, 30, "codex.exe")
+        };
+        True(CodexForegroundDetector.IsCodexForeground(10, "WindowsTerminal.exe", "PowerShell", terminalTree));
+        True(CodexForegroundDetector.IsCodexForeground(10, "pwsh.exe", "Codex", Array.Empty<ProcessTreeEntry>()));
+        True(!CodexForegroundDetector.IsCodexForeground(10, "pwsh.exe", "PowerShell", Array.Empty<ProcessTreeEntry>()));
+        True(!CodexForegroundDetector.IsCodexForeground(10, "devenv.exe", "codex project", terminalTree));
+    }),
+    ("delayed consumption callbacks remain suppressed while pet is hidden", () =>
+    {
+        var manuallyVisibleAtQueueTime = true;
+        var manuallyVisibleAtExecutionTime = false;
+        True(PetVisibilityPolicy.ShouldShow(manuallyVisibleAtQueueTime, false, false, true));
+        True(!PetVisibilityPolicy.ShouldShow(manuallyVisibleAtExecutionTime, false, false, true));
     }),
     ("quota history presents continuous burn", () =>
     {
@@ -86,6 +151,73 @@ var tests = new (string Name, Action Run)[]
             True(layout.OrbitRadius + satelliteHalfDiagonal < layout.OrbitSize / 2);
             True(layout.WindowHeight > layout.OrbitSize);
         }
+    }),
+    ("semantic versions follow release precedence", () =>
+    {
+        True(SemanticVersion.TryParse("v1.2.3", out var stable));
+        True(SemanticVersion.TryParse("1.2.3-rc.2+build.7", out var candidate));
+        True(SemanticVersion.TryParse("1.2.3-rc.10", out var laterCandidate));
+        True(stable.CompareTo(candidate) > 0);
+        True(laterCandidate.CompareTo(candidate) > 0);
+        True(!SemanticVersion.TryParse("1.02.3", out _));
+    }),
+    ("release checksum is strict and file-bound", () =>
+    {
+        var hash = new string('a', 64);
+        Equal(hash.ToUpperInvariant(), UpdateManager.ParseChecksum($"{hash}  QuotaWisp-win-x64.zip\n", "QuotaWisp-win-x64.zip"));
+        Throws<InvalidDataException>(() => UpdateManager.ParseChecksum($"{hash}  another.zip", "QuotaWisp-win-x64.zip"));
+        Throws<InvalidDataException>(() => UpdateManager.ParseChecksum($"{hash}  QuotaWisp-win-x64.zip\n{hash}  QuotaWisp-win-x64.zip", "QuotaWisp-win-x64.zip"));
+    }),
+    ("legacy object mix settings are ignored", () =>
+    {
+        var settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(
+            """{"PetVisible":false,"ObjectWeights":{"space":3,"nature":2,"code":1}}""");
+        True(settings is not null); True(!settings!.PetVisible);
+    }),
+    ("release metadata requires the expected GitHub assets", () =>
+    {
+        const string json = """{"tag_name":"v999.0.0","assets":[{"name":"QuotaWisp-win-x64.zip","browser_download_url":"https://github.com/Demian87/codex-quota-pet-win/releases/download/v999.0.0/QuotaWisp-win-x64.zip"},{"name":"QuotaWisp-win-x64.zip.sha256","browser_download_url":"https://github.com/Demian87/codex-quota-pet-win/releases/download/v999.0.0/QuotaWisp-win-x64.zip.sha256"}]}""";
+        using var client = new System.Net.Http.HttpClient(new StubHttpHandler(json));
+        using var manager = new UpdateManager(client);
+        var release = manager.CheckAsync(CancellationToken.None).GetAwaiter().GetResult();
+        Equal("999.0.0", release?.Version.ToString());
+        True(release?.ArchiveUrl.Scheme == Uri.UriSchemeHttps);
+    }),
+    ("update archives reject zip slip", () =>
+    {
+        var root = Path.Combine(Path.GetTempPath(), "QuotaWispSelfTest-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var archivePath = Path.Combine(root, "bad.zip");
+            using (var archive = System.IO.Compression.ZipFile.Open(archivePath, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                using var writer = new StreamWriter(archive.CreateEntry("../outside.txt").Open());
+                writer.Write("not allowed");
+            }
+            Throws<InvalidDataException>(() => SafeZipExtractor.Extract(archivePath, Path.Combine(root, "payload")));
+            True(!File.Exists(Path.Combine(root, "outside.txt")));
+        }
+        finally { Directory.Delete(root, true); }
+    }),
+    ("update installer replaces payload files", () =>
+    {
+        var root = Path.Combine(Path.GetTempPath(), "QuotaWispInstallTest-" + Guid.NewGuid().ToString("N"));
+        var payload = Path.Combine(root, "payload");
+        var install = Path.Combine(root, "install");
+        Directory.CreateDirectory(Path.Combine(payload, "data"));
+        Directory.CreateDirectory(install);
+        try
+        {
+            File.WriteAllText(Path.Combine(install, "QuotaWisp.exe"), "old");
+            File.WriteAllText(Path.Combine(payload, "QuotaWisp.exe"), "new");
+            File.WriteAllText(Path.Combine(payload, "data", "version.txt"), "1.2.3");
+            UpdateBootstrapper.InstallWithRollback(payload, install);
+            Equal("new", File.ReadAllText(Path.Combine(install, "QuotaWisp.exe")));
+            Equal("1.2.3", File.ReadAllText(Path.Combine(install, "data", "version.txt")));
+            True(!Directory.GetDirectories(install, ".quotawisp-rollback-*", SearchOption.TopDirectoryOnly).Any());
+        }
+        finally { Directory.Delete(root, true); }
     })
 };
 
@@ -115,3 +247,18 @@ return failures == 0 ? 0 : 1;
 static void True(bool value) { if (!value) throw new InvalidOperationException("Expected true."); }
 static void Equal<T>(T expected, T actual)
 { if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new InvalidOperationException($"Expected {expected}, got {actual}."); }
+static void Throws<T>(Action action) where T : Exception
+{
+    try { action(); }
+    catch (T) { return; }
+    throw new InvalidOperationException($"Expected {typeof(T).Name}.");
+}
+
+sealed class StubHttpHandler(string response) : System.Net.Http.HttpMessageHandler
+{
+    protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken) =>
+        Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new System.Net.Http.StringContent(response)
+        });
+}

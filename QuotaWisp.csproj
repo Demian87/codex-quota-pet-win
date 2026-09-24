@@ -12,10 +12,11 @@
     <ApplicationIcon>Assets\quota-wisp.ico</ApplicationIcon>
     <AssemblyName>QuotaWisp</AssemblyName>
     <RootNamespace>QuotaWisp</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.5.0</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <DebugType>embedded</DebugType>
     <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;.build\**</DefaultItemExcludes>

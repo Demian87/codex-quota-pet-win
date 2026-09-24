@@ -10,7 +10,7 @@ public sealed class CodexAppServerClient : IDisposable
     private static readonly string ClientVersion =
         typeof(CodexAppServerClient).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion.Split('+')[0] ?? "1.0.0";
+            .InformationalVersion.Split('+')[0] ?? "1.5.0";
 
     private Process? _process;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
@@ -19,6 +19,7 @@ public sealed class CodexAppServerClient : IDisposable
 
     public event EventHandler<QuotaSnapshot>? SnapshotReceived;
     public event EventHandler<SpeedMode>? SpeedModeReceived;
+    public event EventHandler<ResetCreditsUpdate>? ResetCreditsReceived;
 
     public async Task RunAsync(string? customPath, CancellationToken token)
     {
@@ -104,7 +105,12 @@ public sealed class CodexAppServerClient : IDisposable
             }
             if (!root.TryGetProperty("result", out var result)) return;
 
-            if (TryParseRateLimits(result, out var snapshot)) SnapshotReceived?.Invoke(this, snapshot);
+            if (TryParseRateLimits(result, out var snapshot))
+            {
+                SnapshotReceived?.Invoke(this, snapshot);
+                ResetCreditsReceived?.Invoke(this, new ResetCreditsUpdate(
+                    TryParseResetCredits(result, out var availableCount) ? availableCount : null));
+            }
             else if (result.TryGetProperty("config", out var config))
             {
                 var tier = GetString(config, "service_tier")?.ToLowerInvariant();
@@ -117,12 +123,43 @@ public sealed class CodexAppServerClient : IDisposable
     public static bool TryParseRateLimits(JsonElement result, out QuotaSnapshot snapshot)
     {
         snapshot = new(null, null, null);
-        if (!result.TryGetProperty("rateLimits", out var limits)) return false;
+        if (result.ValueKind != JsonValueKind.Object) return false;
+        if (!result.TryGetProperty("rateLimits", out var limits))
+        {
+            foreach (var envelope in new[] { "result", "data", "payload", "response" })
+            {
+                if (result.TryGetProperty(envelope, out var nested) &&
+                    TryParseRateLimits(nested, out snapshot)) return true;
+            }
+            return false;
+        }
         if (result.TryGetProperty("rateLimitsByLimitId", out var byId) &&
             byId.ValueKind == JsonValueKind.Object && byId.TryGetProperty("codex", out var codex)) limits = codex;
         snapshot = new QuotaSnapshot(
             GetString(limits, "planType"), ParseWindow(limits, "primary"), ParseWindow(limits, "secondary"));
         return true;
+    }
+
+    public static bool TryParseResetCredits(JsonElement payload, out int availableCount)
+    {
+        availableCount = 0;
+        if (payload.ValueKind != JsonValueKind.Object) return false;
+
+        if (payload.TryGetProperty("rateLimitResetCredits", out var credits) &&
+            credits.ValueKind == JsonValueKind.Object &&
+            GetInt(credits, "availableCount") is { } count)
+        {
+            availableCount = Math.Max(0, count);
+            return true;
+        }
+
+        // Some App Server transports retain one or more RPC/data envelopes.
+        foreach (var envelope in new[] { "result", "data", "payload", "response" })
+        {
+            if (payload.TryGetProperty(envelope, out var nested) &&
+                TryParseResetCredits(nested, out availableCount)) return true;
+        }
+        return false;
     }
 
     private static QuotaWindow? ParseWindow(JsonElement parent, string name)

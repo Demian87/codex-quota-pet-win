@@ -13,9 +13,15 @@ public partial class App : System.Windows.Application
     private TrayService? _tray;
     private AppState? _state;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (await UpdateBootstrapper.TryRunInstallerAsync(e.Args))
+        {
+            Shutdown();
+            return;
+        }
+        UpdateBootstrapper.ScheduleCleanup(e.Args);
         _singleInstance = new System.Threading.Mutex(true, "QuotaWisp.Win11.SingleInstance", out var created);
         if (!created) { Shutdown(); return; }
 
@@ -26,6 +32,8 @@ public partial class App : System.Windows.Application
         _state.LowQuotaNotification += (_, message) => Dispatcher.BeginInvoke(() => _tray.ShowNotification(message));
         petWindow.Show();
         _ = _state.StartAsync();
+        if (e.Args.Contains("--update-install-failed", StringComparer.Ordinal))
+            _ = Dispatcher.BeginInvoke(() => System.Windows.MessageBox.Show(L.T("updateinstallerror"), L.T("updatetitle"), MessageBoxButton.OK, MessageBoxImage.Error));
     }
 
     protected override void OnExit(ExitEventArgs e)

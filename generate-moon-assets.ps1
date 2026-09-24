@@ -1,5 +1,7 @@
 param(
-    [string]$Master = (Join-Path $PSScriptRoot 'Assets\moon-master.png')
+    [string]$Master = (Join-Path $PSScriptRoot 'Assets\moon-master.png'),
+    [ValidateRange(256, 2048)]
+    [int]$OutputSize = 768
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,9 +15,19 @@ using System.Runtime.InteropServices;
 
 public static class QuotaMoonAssetGenerator
 {
-    public static void Generate(string sourcePath, string destinationPath, int remainingPercent)
+    public static void Generate(string sourcePath, string destinationPath, int remainingPercent, int outputSize)
     {
-        using var source = new Bitmap(sourcePath);
+        using var original = new Bitmap(sourcePath);
+        using var source = new Bitmap(outputSize, outputSize, PixelFormat.Format32bppArgb);
+        using (var graphics = Graphics.FromImage(source))
+        {
+            graphics.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+            graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+            graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+            graphics.DrawImage(original, 0, 0, outputSize, outputSize);
+        }
         using var destination = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
         var rectangle = new Rectangle(0, 0, source.Width, source.Height);
         var sourceData = source.LockBits(rectangle, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
@@ -105,7 +117,7 @@ if (-not (Test-Path -LiteralPath $Master)) {
 $assets = Join-Path $PSScriptRoot 'Assets'
 foreach ($percent in 100, 90, 80, 70, 60, 50, 40, 30, 20, 10) {
     $name = if ($percent -eq 100) { 'quota-wisp.png' } else { "quota-wisp-$percent.png" }
-    [QuotaMoonAssetGenerator]::Generate($Master, (Join-Path $assets $name), $percent)
+    [QuotaMoonAssetGenerator]::Generate($Master, (Join-Path $assets $name), $percent, $OutputSize)
 }
 
 $iconSizes = 256, 64, 32, 16

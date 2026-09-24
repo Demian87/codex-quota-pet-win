@@ -91,7 +91,7 @@ The workflow can also be started manually for an existing `vX.Y.Z` tag from the 
 
 ## Artwork
 
-`Assets/moon-master.png` is an original AI-generated project asset created for this Windows implementation. Generation prompt: a realistic full disk of Earth's Moon with neutral white and gray crater detail, transparent background, and no blue tint, atmosphere, baked-in halo, text, logos, or additional objects. It was generated with the built-in image generation tool. `generate-moon-assets.ps1` deterministically produces the ten neutral-color quota phases and the application icon from that master; the first waning phase starts at exactly 90% remaining quota. WPF adds a small neutral-white glow at runtime without recoloring the lunar surface.
+`Assets/moon-master.png` is an original AI-generated project asset created for this Windows implementation. Generation prompt: a realistic full disk of Earth's Moon with neutral white and gray crater detail, transparent background, and no blue tint, atmosphere, baked-in halo, text, logos, or additional objects. It was generated with the built-in image generation tool. `generate-moon-assets.ps1` deterministically produces the ten neutral-color 768×768 runtime phases and the application icon from that master; the first waning phase starts at exactly 90% remaining quota. The high-resolution master is retained for future regeneration. WPF adds a small neutral-white glow at runtime without recoloring the lunar surface.
 
 ## Landing page
 

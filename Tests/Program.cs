@@ -168,6 +168,15 @@ var tests = new (string Name, Action Run)[]
         Throws<InvalidDataException>(() => UpdateManager.ParseChecksum($"{hash}  another.zip", "QuotaWisp-win-x64.zip"));
         Throws<InvalidDataException>(() => UpdateManager.ParseChecksum($"{hash}  QuotaWisp-win-x64.zip\n{hash}  QuotaWisp-win-x64.zip", "QuotaWisp-win-x64.zip"));
     }),
+    ("release metadata requires the expected GitHub assets", () =>
+    {
+        const string json = """{"tag_name":"v999.0.0","assets":[{"name":"QuotaWisp-win-x64.zip","browser_download_url":"https://github.com/Demian87/codex-quota-pet-win/releases/download/v999.0.0/QuotaWisp-win-x64.zip"},{"name":"QuotaWisp-win-x64.zip.sha256","browser_download_url":"https://github.com/Demian87/codex-quota-pet-win/releases/download/v999.0.0/QuotaWisp-win-x64.zip.sha256"}]}""";
+        using var client = new System.Net.Http.HttpClient(new StubHttpHandler(json));
+        using var manager = new UpdateManager(client);
+        var release = manager.CheckAsync(CancellationToken.None).GetAwaiter().GetResult();
+        Equal("999.0.0", release?.Version.ToString());
+        True(release?.ArchiveUrl.Scheme == Uri.UriSchemeHttps);
+    }),
     ("update archives reject zip slip", () =>
     {
         var root = Path.Combine(Path.GetTempPath(), "QuotaWispSelfTest-" + Guid.NewGuid().ToString("N"));
@@ -237,4 +246,13 @@ static void Throws<T>(Action action) where T : Exception
     try { action(); }
     catch (T) { return; }
     throw new InvalidOperationException($"Expected {typeof(T).Name}.");
+}
+
+sealed class StubHttpHandler(string response) : System.Net.Http.HttpMessageHandler
+{
+    protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken) =>
+        Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new System.Net.Http.StringContent(response)
+        });
 }

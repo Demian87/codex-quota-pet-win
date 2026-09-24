@@ -88,6 +88,35 @@ var tests = new (string Name, Action Run)[]
         True(PetInputRegion.Contains(new System.Windows.Point(15, 15), new System.Windows.Point(100, 100), 50, satellites));
         True(!PetInputRegion.Contains(new System.Windows.Point(5, 90), new System.Windows.Point(100, 100), 50, satellites));
     }),
+    ("pet visibility respects manual fullscreen and active-Codex suppression", () =>
+    {
+        True(PetVisibilityPolicy.ShouldShow(true, false, false, false));
+        True(!PetVisibilityPolicy.ShouldShow(false, false, false, true));
+        True(!PetVisibilityPolicy.ShouldShow(true, true, false, true));
+        True(!PetVisibilityPolicy.ShouldShow(true, false, true, false));
+        True(PetVisibilityPolicy.ShouldShow(true, false, true, true));
+    }),
+    ("Codex desktop and terminal child processes count as active", () =>
+    {
+        True(CodexForegroundDetector.IsCodexForeground(10, "Codex.exe", "", Array.Empty<ProcessTreeEntry>()));
+        var terminalTree = new[]
+        {
+            new ProcessTreeEntry(20, 10, "OpenConsole.exe"),
+            new ProcessTreeEntry(30, 20, "pwsh.exe"),
+            new ProcessTreeEntry(40, 30, "codex.exe")
+        };
+        True(CodexForegroundDetector.IsCodexForeground(10, "WindowsTerminal.exe", "PowerShell", terminalTree));
+        True(CodexForegroundDetector.IsCodexForeground(10, "pwsh.exe", "Codex", Array.Empty<ProcessTreeEntry>()));
+        True(!CodexForegroundDetector.IsCodexForeground(10, "pwsh.exe", "PowerShell", Array.Empty<ProcessTreeEntry>()));
+        True(!CodexForegroundDetector.IsCodexForeground(10, "devenv.exe", "codex project", terminalTree));
+    }),
+    ("delayed consumption callbacks remain suppressed while pet is hidden", () =>
+    {
+        var manuallyVisibleAtQueueTime = true;
+        var manuallyVisibleAtExecutionTime = false;
+        True(PetVisibilityPolicy.ShouldShow(manuallyVisibleAtQueueTime, false, false, true));
+        True(!PetVisibilityPolicy.ShouldShow(manuallyVisibleAtExecutionTime, false, false, true));
+    }),
     ("quota history presents continuous burn", () =>
     {
         var now = new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);

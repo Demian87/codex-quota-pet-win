@@ -12,7 +12,7 @@ An original, local-only Windows 11 desktop pet that shows Codex quota. For the m
 - Smooth and pixel tooltip styles, English and Russian UI.
 - S/M/L sizes, drag, lock, click-through, multi-monitor position restore.
 - Transparent window padding passes pointer input to applications underneath.
-- Hide in fullscreen apps and user-level Windows startup.
+- Optional visibility only while Codex is active, fullscreen hiding and user-level Windows startup.
 - 30-day local quota history, consumption reactions and weighted interactive objects.
 
 ## Tooltip preview
@@ -51,6 +51,8 @@ Extract `QuotaWisp-win-x64.zip` and run `QuotaWisp.exe`. The build is self-conta
 Quota Wisp looks for `codex.exe`, `codex.cmd`, or `codex.ps1` in standard locations and `PATH`. A custom path can be selected from the tray menu.
 
 Settings and history are stored under `%LOCALAPPDATA%\QuotaWisp`. Enabling startup adds the current executable to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+
+The optional **Behavior → Show only while Codex is active** mode recognizes the Codex desktop process directly. For Codex CLI it checks whether `codex.exe` is a descendant of the foreground PowerShell, Command Prompt, Windows Terminal or another supported terminal host; a terminal title containing `Codex` is used as a fallback for pseudoconsole layouts whose process tree is not exposed to the terminal window. Manual hiding always wins, followed by fullscreen suppression, then this foreground-app rule. The setting is saved locally and disabled by default.
 
 ## Build and verify
 

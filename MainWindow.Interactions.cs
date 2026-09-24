@@ -81,24 +81,50 @@ public partial class MainWindow
     {
         var menu = new ContextMenu();
         menu.Items.Add(Item(L.T("refresh"), async () => await _state.RefreshAsync()));
-        menu.Items.Add(Item(_state.Settings.PetVisible ? L.T("hide") : L.T("show"), () => _state.SetPetVisible(!_state.Settings.PetVisible)));
-        menu.Items.Add(CheckItem(L.T("lock"), _state.Settings.LockPosition, v => _state.SetLockPosition(v)));
-        menu.Items.Add(CheckItem(L.T("clickthrough"), _state.Settings.ClickThrough, v => _state.SetClickThrough(v)));
+
+        var appearance = new MenuItem { Header = L.T("appearance") };
         var sizes = new MenuItem { Header = L.T("size") };
         foreach (var size in Enum.GetValues<PetSize>())
         {
             var key = size switch { PetSize.Small => "small", PetSize.Large => "large", _ => "medium" };
             sizes.Items.Add(CheckItem(L.T(key), _state.Settings.PetSize == size, _ => _state.SetPetSize(size)));
         }
-        menu.Items.Add(sizes);
+        appearance.Items.Add(sizes);
         var styles = new MenuItem { Header = L.T("tooltip") };
         foreach (var style in Enum.GetValues<TooltipStyle>())
             styles.Items.Add(CheckItem(L.T(style == TooltipStyle.Smooth ? "smooth" : "pixel"), _state.Settings.TooltipStyle == style, _ => _state.SetTooltipStyle(style)));
-        menu.Items.Add(styles);
-        menu.Items.Add(CheckItem(L.T("history"), _state.Settings.ShowHistory, v => _state.SetShowHistory(v)));
-        menu.Items.Add(CheckItem(L.T("fullscreen"), _state.Settings.HideInFullscreen, v => _state.SetHideInFullscreen(v)));
-        menu.Items.Add(CheckItem(L.T("autostart"), _state.Settings.LaunchAtLogin, v => _state.SetAutoStart(v)));
+        appearance.Items.Add(styles);
+        appearance.Items.Add(CheckItem(L.T("history"), _state.Settings.ShowHistory, v => _state.SetShowHistory(v)));
+        appearance.Items.Add(Item(L.T("clearhistory"), _state.ClearHistory));
+        menu.Items.Add(appearance);
+
+        var objects = new MenuItem { Header = L.T("objects") };
+        AddWeightMenu(objects, "Space / Космос", "space");
+        AddWeightMenu(objects, "Nature / Природа", "nature");
+        AddWeightMenu(objects, "Code / Код", "code");
+        menu.Items.Add(objects);
+
+        var behavior = new MenuItem { Header = L.T("behavior") };
+        behavior.Items.Add(Item(_state.Settings.PetVisible ? L.T("hide") : L.T("show"), () => _state.SetPetVisible(!_state.Settings.PetVisible)));
+        behavior.Items.Add(CheckItem(L.T("lock"), _state.Settings.LockPosition, v => _state.SetLockPosition(v)));
+        behavior.Items.Add(CheckItem(L.T("clickthrough"), _state.Settings.ClickThrough, v => _state.SetClickThrough(v)));
+        behavior.Items.Add(CheckItem(L.T("codexactive"), _state.Settings.ShowOnlyWhenCodexActive, v => _state.SetShowOnlyWhenCodexActive(v)));
+        behavior.Items.Add(CheckItem(L.T("fullscreen"), _state.Settings.HideInFullscreen, v => _state.SetHideInFullscreen(v)));
+        behavior.Items.Add(CheckItem(L.T("autostart"), _state.Settings.LaunchAtLogin, v => _state.SetAutoStart(v)));
+        menu.Items.Add(behavior);
         PetSurface.ContextMenu = menu;
+    }
+
+    private void AddWeightMenu(MenuItem parent, string title, string category)
+    {
+        var child = new MenuItem { Header = title };
+        var current = _state.Settings.ObjectWeights.GetValueOrDefault(category, 1);
+        for (var value = 0; value <= 3; value++)
+        {
+            var captured = value;
+            child.Items.Add(CheckItem(value.ToString(), current == value, _ => _state.SetObjectWeight(category, captured)));
+        }
+        parent.Items.Add(child);
     }
 
     private static MenuItem Item(string title, Action action)

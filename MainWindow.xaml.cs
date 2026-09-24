@@ -17,11 +17,11 @@ public partial class MainWindow : Window
 {
     private readonly AppState _state;
     private readonly DispatcherTimer _animationTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
-    private readonly DispatcherTimer _fullscreenTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _visibilityTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _positionTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
     private readonly Random _random = new();
     private Point _pointerStart, _windowStart;
-    private bool _dragging, _fullscreenSuppressed;
+    private bool _dragging, _fullscreenSuppressed, _codexActive = true;
     private bool? _nativeClickThrough;
     private double _phase;
     private PetSize? _appliedSize;
@@ -33,23 +33,27 @@ public partial class MainWindow : Window
         _state = state;
         InitializeComponent();
         _state.Changed += (_, _) => Dispatcher.BeginInvoke(UpdateFromState);
-        _state.QuotaConsumed += (_, delta) => Dispatcher.BeginInvoke(() => PlayConsumptionReaction(delta));
+        _state.QuotaConsumed += (_, delta) => Dispatcher.BeginInvoke(() =>
+        {
+            RefreshVisibilityConditions();
+            if (ShouldPresentPet() && IsVisible) PlayConsumptionReaction(delta);
+        });
         Loaded += OnLoaded;
         LocationChanged += (_, _) => { if (!_dragging) { _positionTimer.Stop(); _positionTimer.Start(); } };
         _positionTimer.Tick += (_, _) => { _positionTimer.Stop(); SavePosition(); };
         _animationTimer.Tick += Animate;
-        _fullscreenTimer.Tick += (_, _) => CheckFullscreen();
+        _visibilityTimer.Tick += (_, _) => CheckVisibilityConditions();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        RestorePosition(); ApplySize(); UpdateFromState(); ApplyClickThrough();
-        _animationTimer.Start(); _fullscreenTimer.Start(); BuildContextMenu();
+        RestorePosition(); ApplySize(); RefreshVisibilityConditions(); UpdateFromState(); ApplyClickThrough();
+        _animationTimer.Start(); _visibilityTimer.Start(); BuildContextMenu();
     }
 
     private void UpdateFromState()
     {
-        ApplySize(); ApplyClickThrough(); ApplyVisibility(); UpdateTooltip(); UpdateQuotaImage();
+        ApplySize(); ApplyClickThrough(); RefreshVisibilityConditions(); ApplyVisibility(); UpdateTooltip(); UpdateQuotaImage();
         AutomationProperties.SetName(WispImage, AccessibleSummary()); BuildContextMenu();
     }
 
@@ -180,14 +184,22 @@ public partial class MainWindow : Window
         Win32.SetClickThrough(this, enabled);
         _nativeClickThrough = enabled;
     }
-    private void CheckFullscreen()
+    private void CheckVisibilityConditions()
     {
-        _fullscreenSuppressed = _state.Settings.HideInFullscreen && Win32.IsForegroundFullscreen(new WindowInteropHelper(this).Handle);
+        RefreshVisibilityConditions();
         ApplyVisibility();
     }
+    private void RefreshVisibilityConditions()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        _fullscreenSuppressed = _state.Settings.HideInFullscreen && Win32.IsForegroundFullscreen(handle);
+        _codexActive = !_state.Settings.ShowOnlyWhenCodexActive || Win32.IsCodexForeground(handle);
+    }
+    private bool ShouldPresentPet() => PetVisibilityPolicy.ShouldShow(
+        _state.Settings.PetVisible, _fullscreenSuppressed, _state.Settings.ShowOnlyWhenCodexActive, _codexActive);
     private void ApplyVisibility()
     {
-        if (_state.Settings.PetVisible && !_fullscreenSuppressed)
+        if (ShouldPresentPet())
         { if (!IsVisible) Show(); Opacity = 1; }
         else if (IsVisible) Hide();
     }
@@ -207,5 +219,5 @@ public partial class MainWindow : Window
         Left = Math.Clamp(Left, area.Left, Math.Max(area.Left, area.Right - Width));
         Top = Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - Height));
     }
-    public void BringPetBack() { _state.SetPetVisible(true); _fullscreenSuppressed = false; ApplyVisibility(); Topmost = true; }
+    public void BringPetBack() { _state.SetPetVisible(true); RefreshVisibilityConditions(); ApplyVisibility(); Topmost = true; }
 }

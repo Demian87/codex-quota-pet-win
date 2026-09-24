@@ -56,41 +56,45 @@ public sealed class TrayService : IDisposable
             Add(menu, _state.LastError ?? L.T("reconnecting"), null, false);
         menu.Items.Add(new Forms.ToolStripSeparator());
         Add(menu, L.T("refresh"), async () => await _state.RefreshAsync());
-        Add(menu, _state.Settings.PetVisible ? L.T("hide") : L.T("show"), () =>
-        {
-            _state.SetPetVisible(!_state.Settings.PetVisible);
-            if (_state.Settings.PetVisible) _window.BringPetBack();
-        });
 
+        var appearance = Submenu(L.T("appearance"));
         var size = Submenu(L.T("size"));
         AddCheck(size, L.T("small"), _state.Settings.PetSize == PetSize.Small, () => _state.SetPetSize(PetSize.Small));
         AddCheck(size, L.T("medium"), _state.Settings.PetSize == PetSize.Medium, () => _state.SetPetSize(PetSize.Medium));
         AddCheck(size, L.T("large"), _state.Settings.PetSize == PetSize.Large, () => _state.SetPetSize(PetSize.Large));
-        menu.Items.Add(size);
-
-        AddCheck(menu, L.T("lock"), _state.Settings.LockPosition, () => _state.SetLockPosition(!_state.Settings.LockPosition));
-        AddCheck(menu, L.T("clickthrough"), _state.Settings.ClickThrough, () => _state.SetClickThrough(!_state.Settings.ClickThrough));
+        appearance.DropDownItems.Add(size);
 
         var tooltip = Submenu(L.T("tooltip"));
         AddCheck(tooltip, L.T("smooth"), _state.Settings.TooltipStyle == TooltipStyle.Smooth, () => _state.SetTooltipStyle(TooltipStyle.Smooth));
         AddCheck(tooltip, L.T("pixel"), _state.Settings.TooltipStyle == TooltipStyle.Pixel, () => _state.SetTooltipStyle(TooltipStyle.Pixel));
-        menu.Items.Add(tooltip);
-
-        var objects = Submenu(L.T("objects"));
-        AddWeightMenu(objects, "Space / Космос", "space"); AddWeightMenu(objects, "Nature / Природа", "nature"); AddWeightMenu(objects, "Code / Код", "code");
-        menu.Items.Add(objects);
-
-        AddCheck(menu, L.T("history"), _state.Settings.ShowHistory, () => _state.SetShowHistory(!_state.Settings.ShowHistory));
-        Add(menu, L.T("clearhistory"), _state.ClearHistory);
-        AddCheck(menu, L.T("fullscreen"), _state.Settings.HideInFullscreen, () => _state.SetHideInFullscreen(!_state.Settings.HideInFullscreen));
-        AddCheck(menu, L.T("autostart"), _state.Settings.LaunchAtLogin, () => _state.SetAutoStart(!_state.Settings.LaunchAtLogin));
-        Add(menu, L.T("codexpath"), SelectCodexPath);
+        appearance.DropDownItems.Add(tooltip);
+        AddCheck(appearance, L.T("history"), _state.Settings.ShowHistory, () => _state.SetShowHistory(!_state.Settings.ShowHistory));
+        Add(appearance, L.T("clearhistory"), _state.ClearHistory);
 
         var language = Submenu(L.T("language"));
         AddCheck(language, L.T("auto"), _state.Settings.Language == UiLanguage.Auto, () => _state.SetLanguage(UiLanguage.Auto));
         AddCheck(language, L.T("english"), _state.Settings.Language == UiLanguage.English, () => _state.SetLanguage(UiLanguage.English));
         AddCheck(language, L.T("russian"), _state.Settings.Language == UiLanguage.Russian, () => _state.SetLanguage(UiLanguage.Russian));
-        menu.Items.Add(language);
+        appearance.DropDownItems.Add(language);
+        menu.Items.Add(appearance);
+
+        var objects = Submenu(L.T("objects"));
+        AddWeightMenu(objects, "Space / Космос", "space"); AddWeightMenu(objects, "Nature / Природа", "nature"); AddWeightMenu(objects, "Code / Код", "code");
+        menu.Items.Add(objects);
+
+        var behavior = Submenu(L.T("behavior"));
+        Add(behavior, _state.Settings.PetVisible ? L.T("hide") : L.T("show"), () =>
+        {
+            _state.SetPetVisible(!_state.Settings.PetVisible);
+            if (_state.Settings.PetVisible) _window.BringPetBack();
+        });
+        AddCheck(behavior, L.T("lock"), _state.Settings.LockPosition, () => _state.SetLockPosition(!_state.Settings.LockPosition));
+        AddCheck(behavior, L.T("clickthrough"), _state.Settings.ClickThrough, () => _state.SetClickThrough(!_state.Settings.ClickThrough));
+        AddCheck(behavior, L.T("codexactive"), _state.Settings.ShowOnlyWhenCodexActive, () => _state.SetShowOnlyWhenCodexActive(!_state.Settings.ShowOnlyWhenCodexActive));
+        AddCheck(behavior, L.T("fullscreen"), _state.Settings.HideInFullscreen, () => _state.SetHideInFullscreen(!_state.Settings.HideInFullscreen));
+        AddCheck(behavior, L.T("autostart"), _state.Settings.LaunchAtLogin, () => _state.SetAutoStart(!_state.Settings.LaunchAtLogin));
+        Add(behavior, L.T("codexpath"), SelectCodexPath);
+        menu.Items.Add(behavior);
         menu.Items.Add(new Forms.ToolStripSeparator());
         Add(menu, L.T("quit"), () => System.Windows.Application.Current.Shutdown());
 
@@ -121,6 +125,8 @@ public sealed class TrayService : IDisposable
     private static Forms.ToolStripMenuItem Submenu(string title) => new(title);
     private static void Add(Forms.ContextMenuStrip menu, string text, Action? action, bool enabled = true)
     { var item = new Forms.ToolStripMenuItem(text) { Enabled = enabled }; if (action is not null) item.Click += (_, _) => action(); menu.Items.Add(item); }
+    private static void Add(Forms.ToolStripMenuItem menu, string text, Action? action, bool enabled = true)
+    { var item = new Forms.ToolStripMenuItem(text) { Enabled = enabled }; if (action is not null) item.Click += (_, _) => action(); menu.DropDownItems.Add(item); }
     private static void AddCheck(Forms.ContextMenuStrip menu, string text, bool check, Action action)
     { var item = new Forms.ToolStripMenuItem(text) { Checked = check }; item.Click += (_, _) => action(); menu.Items.Add(item); }
     private static void AddCheck(Forms.ToolStripMenuItem menu, string text, bool check, Action action)

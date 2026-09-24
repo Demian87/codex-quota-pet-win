@@ -60,6 +60,7 @@ public sealed class AppSettings
     public TooltipStyle TooltipStyle { get; set; } = TooltipStyle.Smooth;
     public UiLanguage Language { get; set; } = UiLanguage.Auto;
     public bool PetVisible { get; set; } = true;
+    public bool ShowOnlyWhenCodexActive { get; set; }
     public bool HideInFullscreen { get; set; }
     public bool LockPosition { get; set; }
     public bool ClickThrough { get; set; }

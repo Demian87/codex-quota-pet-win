@@ -145,6 +145,7 @@ public sealed class AppState : IDisposable
     public void SetTooltipStyle(TooltipStyle value) { Settings.TooltipStyle = value; SaveAndRaise(); }
     public void SetLockPosition(bool value) { Settings.LockPosition = value; SaveAndRaise(); }
     public void SetClickThrough(bool value) { Settings.ClickThrough = value; SaveAndRaise(); }
+    public void SetShowOnlyWhenCodexActive(bool value) { Settings.ShowOnlyWhenCodexActive = value; SaveAndRaise(); }
     public void SetHideInFullscreen(bool value) { Settings.HideInFullscreen = value; SaveAndRaise(); }
     public void SetShowHistory(bool value) { Settings.ShowHistory = value; SaveAndRaise(); }
     public void SetLanguage(UiLanguage value) { Settings.Language = value; L.SetLanguage(value); SaveAndRaise(); }

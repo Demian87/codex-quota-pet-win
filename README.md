@@ -5,7 +5,7 @@ An original, local-only Windows 11 desktop pet that shows Codex quota. For the m
 ## Features
 
 - Transparent always-on-top WPF pet with an original animated moon-and-satellites image.
-- Primary and secondary quota, reset time, Standard/Turbo mode.
+- Primary and secondary quota, reset time, Standard/Turbo mode, and available manual reset credits.
 - Local Codex App Server JSON-RPC; no telemetry. Network access occurs only when the user explicitly checks for an update.
 - Automatic reconnect, event refresh, 60-second polling and hover refresh.
 - Stale callbacks from replaced Codex connections are discarded.
@@ -67,14 +67,14 @@ Installation is performed by a temporary copy of Quota Wisp only after the main 
 dotnet run --project .\Tests\QuotaWisp.SelfTest.csproj
 .\build-portable.ps1
 # Build a specific release version locally:
-.\build-portable.ps1 -Version 1.1.0
+.\build-portable.ps1 -Version 1.2.0
 ```
 
 The project targets Windows 11 x64 and .NET 8 WPF. It has no third-party runtime dependencies.
 
 ## Automated releases
 
-GitHub Actions builds and publishes a portable ZIP whenever a semantic-version tag such as `v1.1.0` is pushed. The workflow runs the self-tests, produces a self-contained Windows x64 build, creates or updates the matching GitHub Release, and uploads `QuotaWisp-win-x64.zip` with replacement enabled. Therefore the permanent download URL below always resolves to the asset from the latest non-prerelease release:
+GitHub Actions builds and publishes a portable ZIP whenever a semantic-version tag such as `v1.2.0` is pushed. The workflow runs the self-tests, produces a self-contained Windows x64 build, creates or updates the matching GitHub Release, and uploads `QuotaWisp-win-x64.zip` with replacement enabled. Therefore the permanent download URL below always resolves to the asset from the latest non-prerelease release:
 
 ```text
 https://github.com/Demian87/codex-quota-pet-win/releases/latest/download/QuotaWisp-win-x64.zip
@@ -83,8 +83,8 @@ https://github.com/Demian87/codex-quota-pet-win/releases/latest/download/QuotaWi
 Create a release after this workflow is merged into the default branch:
 
 ```powershell
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.2.0
+git push origin v1.2.0
 ```
 
 The workflow can also be started manually for an existing `vX.Y.Z` tag from the Actions tab. It requires the repository's default `GITHUB_TOKEN` with `contents: write`; no signing certificate or additional secret is required. Re-running it for the same tag replaces the existing ZIP instead of creating a duplicate asset.

@@ -79,10 +79,6 @@ public sealed class TrayService : IDisposable
         appearance.DropDownItems.Add(language);
         menu.Items.Add(appearance);
 
-        var objects = Submenu(L.T("objects"));
-        AddWeightMenu(objects, "Space / Космос", "space"); AddWeightMenu(objects, "Nature / Природа", "nature"); AddWeightMenu(objects, "Code / Код", "code");
-        menu.Items.Add(objects);
-
         var behavior = Submenu(L.T("behavior"));
         Add(behavior, _state.Settings.PetVisible ? L.T("hide") : L.T("show"), () =>
         {
@@ -103,14 +99,6 @@ public sealed class TrayService : IDisposable
 
         var old = _icon.ContextMenuStrip; _icon.ContextMenuStrip = menu; old?.Dispose();
         _icon.Text = primary is null ? "Quota Wisp" : $"Quota Wisp — {primary.RemainingPercent}%";
-    }
-
-    private void AddWeightMenu(Forms.ToolStripMenuItem parent, string title, string category)
-    {
-        var child = Submenu(title); var current = _state.Settings.ObjectWeights.GetValueOrDefault(category, 1);
-        for (var value = 0; value <= 3; value++)
-        { var captured = value; AddCheck(child, value.ToString(), current == value, () => _state.SetObjectWeight(category, captured)); }
-        parent.DropDownItems.Add(child);
     }
 
     private void SelectCodexPath()

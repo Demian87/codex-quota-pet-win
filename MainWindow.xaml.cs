@@ -19,7 +19,6 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _animationTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
     private readonly DispatcherTimer _visibilityTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _positionTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
-    private readonly Random _random = new();
     private Point _pointerStart, _windowStart;
     private bool _dragging, _fullscreenSuppressed, _codexActive = true;
     private bool? _nativeClickThrough;

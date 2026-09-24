@@ -168,6 +168,12 @@ var tests = new (string Name, Action Run)[]
         Throws<InvalidDataException>(() => UpdateManager.ParseChecksum($"{hash}  another.zip", "QuotaWisp-win-x64.zip"));
         Throws<InvalidDataException>(() => UpdateManager.ParseChecksum($"{hash}  QuotaWisp-win-x64.zip\n{hash}  QuotaWisp-win-x64.zip", "QuotaWisp-win-x64.zip"));
     }),
+    ("legacy object mix settings are ignored", () =>
+    {
+        var settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(
+            """{"PetVisible":false,"ObjectWeights":{"space":3,"nature":2,"code":1}}""");
+        True(settings is not null); True(!settings!.PetVisible);
+    }),
     ("release metadata requires the expected GitHub assets", () =>
     {
         const string json = """{"tag_name":"v999.0.0","assets":[{"name":"QuotaWisp-win-x64.zip","browser_download_url":"https://github.com/Demian87/codex-quota-pet-win/releases/download/v999.0.0/QuotaWisp-win-x64.zip"},{"name":"QuotaWisp-win-x64.zip.sha256","browser_download_url":"https://github.com/Demian87/codex-quota-pet-win/releases/download/v999.0.0/QuotaWisp-win-x64.zip.sha256"}]}""";

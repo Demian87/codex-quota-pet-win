@@ -5,7 +5,6 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
-using Brushes = System.Windows.Media.Brushes;
 
 namespace QuotaWisp;
 
@@ -28,39 +27,12 @@ public partial class MainWindow
     private void Pet_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         PetSurface.ReleaseMouseCapture();
-        if (_dragging) SavePosition(); else SpawnAbsorbable();
+        if (_dragging) SavePosition();
         _dragging = false; e.Handled = true;
     }
 
     private void Pet_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
     { BuildContextMenu(); PetSurface.ContextMenu.IsOpen = true; e.Handled = true; }
-
-    private void SpawnAbsorbable()
-    {
-        if (!SystemParameters.ClientAreaAnimation) { PlayConsumptionReaction(1); return; }
-        var category = WeightedCategory();
-        var glyphs = category switch
-        {
-            "nature" => new[] { "✿", "❧", "◆", "❀", "☘", "♒", "△", "◌", "❉", "♢", "☂" },
-            "code" => new[] { "{ }", "</>", "#", "01", "λ", "git", "fn", "[]", "=>", "//", "AI" },
-            _ => new[] { "✦", "☄", "◇", "☾", "⊙", "✧", "◉", "⋆", "◎", "◈", "✺", "☼" }
-        };
-        var item = new TextBlock { Text = glyphs[_random.Next(glyphs.Length)], FontSize = 24, Foreground = Brushes.White };
-        EffectsCanvas.Children.Add(item);
-        var startX = _random.NextDouble() * Math.Max(1, ActualWidth - 30); var startY = _random.NextDouble() * Math.Max(1, ActualHeight - 30);
-        Canvas.SetLeft(item, startX); Canvas.SetTop(item, startY);
-        var duration = new Duration(TimeSpan.FromMilliseconds(700));
-        item.BeginAnimation(Canvas.LeftProperty, new DoubleAnimation(ActualWidth / 2, duration) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } });
-        item.BeginAnimation(Canvas.TopProperty, new DoubleAnimation(ActualHeight / 2, duration) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } });
-        var fade = new DoubleAnimation(1, 0, duration); fade.Completed += (_, _) => EffectsCanvas.Children.Remove(item);
-        item.BeginAnimation(OpacityProperty, fade);
-    }
-
-    private string WeightedCategory()
-    {
-        var weighted = _state.Settings.ObjectWeights.SelectMany(pair => Enumerable.Repeat(pair.Key, pair.Value)).ToArray();
-        return weighted.Length == 0 ? "space" : weighted[_random.Next(weighted.Length)];
-    }
 
     private void PlayConsumptionReaction(int delta)
     {
@@ -74,7 +46,6 @@ public partial class MainWindow
         { AutoReverse = true, RepeatBehavior = new RepeatBehavior(delta >= 10 ? 2 : 1) };
         WispScale.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
         WispScale.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
-        for (var i = 0; i < Math.Min(8, 2 + delta / 2); i++) SpawnAbsorbable();
     }
 
     private void BuildContextMenu()
@@ -98,12 +69,6 @@ public partial class MainWindow
         appearance.Items.Add(Item(L.T("clearhistory"), _state.ClearHistory));
         menu.Items.Add(appearance);
 
-        var objects = new MenuItem { Header = L.T("objects") };
-        AddWeightMenu(objects, "Space / Космос", "space");
-        AddWeightMenu(objects, "Nature / Природа", "nature");
-        AddWeightMenu(objects, "Code / Код", "code");
-        menu.Items.Add(objects);
-
         var behavior = new MenuItem { Header = L.T("behavior") };
         behavior.Items.Add(Item(_state.Settings.PetVisible ? L.T("hide") : L.T("show"), () => _state.SetPetVisible(!_state.Settings.PetVisible)));
         behavior.Items.Add(CheckItem(L.T("lock"), _state.Settings.LockPosition, v => _state.SetLockPosition(v)));
@@ -113,18 +78,6 @@ public partial class MainWindow
         behavior.Items.Add(CheckItem(L.T("autostart"), _state.Settings.LaunchAtLogin, v => _state.SetAutoStart(v)));
         menu.Items.Add(behavior);
         PetSurface.ContextMenu = menu;
-    }
-
-    private void AddWeightMenu(MenuItem parent, string title, string category)
-    {
-        var child = new MenuItem { Header = title };
-        var current = _state.Settings.ObjectWeights.GetValueOrDefault(category, 1);
-        for (var value = 0; value <= 3; value++)
-        {
-            var captured = value;
-            child.Items.Add(CheckItem(value.ToString(), current == value, _ => _state.SetObjectWeight(category, captured)));
-        }
-        parent.Items.Add(child);
     }
 
     private static MenuItem Item(string title, Action action)

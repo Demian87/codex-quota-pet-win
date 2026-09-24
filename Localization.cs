@@ -37,7 +37,6 @@ public static class L
         ["english"] = ("English", "Английский"), ["russian"] = ("Russian", "Русский"),
         ["codexpath"] = ("Select Codex executable…", "Выбрать исполняемый файл Codex…"),
         ["appearance"] = ("Appearance", "Внешний вид"),
-        ["objects"] = ("Object mix", "Набор объектов"),
         ["behavior"] = ("Behavior", "Поведение"),
         ["quit"] = ("Quit", "Выход"),
         ["checkupdates"] = ("Check for updates…", "Проверить обновления…"),

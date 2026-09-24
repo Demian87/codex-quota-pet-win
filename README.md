@@ -13,7 +13,7 @@ An original, local-only Windows 11 desktop pet that shows Codex quota. For the m
 - S/M/L sizes, drag, lock, click-through, multi-monitor position restore.
 - Transparent window padding passes pointer input to applications underneath.
 - Optional visibility only while Codex is active, fullscreen hiding and user-level Windows startup.
-- 30-day local quota history, consumption reactions and weighted interactive objects.
+- 30-day local quota history and a subtle consumption pulse.
 - Manual, opt-in update check through GitHub Releases; there are no background update checks.
 
 ## Tooltip preview

@@ -165,13 +165,6 @@ public sealed class AppState : IDisposable
         _client?.Dispose();
     }
 
-    public void SetObjectWeight(string category, int weight)
-    {
-        Settings.ObjectWeights[category] = Math.Clamp(weight, 0, 3);
-        if (Settings.ObjectWeights.Values.All(x => x == 0)) Settings.ObjectWeights[category] = 1;
-        SaveAndRaise();
-    }
-
     public void SavePosition(string screenKey, double left, double top)
     {
         Settings.Positions[screenKey] = new WindowPosition(left, top); _settingsStore.Save(Settings);

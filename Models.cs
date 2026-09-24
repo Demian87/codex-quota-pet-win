@@ -68,10 +68,6 @@ public sealed class AppSettings
     public bool LaunchAtLogin { get; set; }
     public string? CodexPath { get; set; }
     public Dictionary<string, WindowPosition> Positions { get; set; } = [];
-    public Dictionary<string, int> ObjectWeights { get; set; } = new()
-    {
-        ["space"] = 2, ["nature"] = 1, ["code"] = 1
-    };
 }
 
 public sealed record WindowPosition(double Left, double Top);

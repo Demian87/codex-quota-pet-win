@@ -30,16 +30,36 @@ var tests = new (string Name, Action Run)[]
         using var absent = JsonDocument.Parse("""{"rateLimits":{}}""");
         True(!CodexAppServerClient.TryParseResetCredits(absent.RootElement, out _));
     }),
-    ("manual reset credits clamp and format", () =>
+    ("manual reset credits distinguish zero unavailable and positive counts", () =>
     {
-        using var negative = JsonDocument.Parse("""{"rateLimitResetCredits":{"availableCount":-4}}""");
-        True(CodexAppServerClient.TryParseResetCredits(negative.RootElement, out var clamped));
-        Equal(0, clamped);
-        Equal<string?>(null, ResetCreditsFormatter.Format(null));
-        Equal<string?>(null, ResetCreditsFormatter.Format(0));
-        Equal("1", ResetCreditsFormatter.Format(1));
-        Equal("99", ResetCreditsFormatter.Format(99));
-        Equal("99+", ResetCreditsFormatter.Format(100));
+        foreach (var language in new[] { UiLanguage.English, UiLanguage.Russian })
+        {
+            L.SetLanguage(language);
+            Equal(language == UiLanguage.Russian ? "Недоступно" : "Unavailable", ResetCreditsFormatter.Format(null));
+            Equal(ResetCreditsFormatter.Format(null), ResetCreditsFormatter.Format(-1));
+            Equal("0", ResetCreditsFormatter.Format(0));
+            Equal("1", ResetCreditsFormatter.Format(1));
+            Equal("99", ResetCreditsFormatter.Format(99));
+            Equal("99+", ResetCreditsFormatter.Format(100));
+            Equal("99+", ResetCreditsFormatter.Format(int.MaxValue));
+        }
+        L.SetLanguage(UiLanguage.English);
+    }),
+    ("manual reset credit parser rejects malformed data without inventing zero", () =>
+    {
+        foreach (var value in new[] { "null", "-4", "\"0\"", "true", "0.5", "2147483648", "{}", "[]" })
+        {
+            using var json = JsonDocument.Parse("{\"rateLimitResetCredits\":{\"availableCount\":" + value + "}}");
+            True(!CodexAppServerClient.TryParseResetCredits(json.RootElement, out _));
+        }
+        foreach (var payload in new[] { "{}", "{\"rateLimitResetCredits\":null}", "{\"rateLimitResetCredits\":{}}" })
+        {
+            using var json = JsonDocument.Parse(payload);
+            True(!CodexAppServerClient.TryParseResetCredits(json.RootElement, out _));
+        }
+        using var zero = JsonDocument.Parse("""{"rateLimitResetCredits":{"availableCount":0}}""");
+        True(CodexAppServerClient.TryParseResetCredits(zero.RootElement, out var count));
+        Equal(0, count);
     }),
     ("manual reset credits are scoped to current connection", () =>
     {
@@ -51,7 +71,37 @@ var tests = new (string Name, Action Run)[]
         True(credits.Update(11, 120)); Equal<int?>(120, credits.AvailableCount);
         True(!credits.End(10)); Equal<int?>(120, credits.AvailableCount);
         True(credits.End(11)); Equal<int?>(null, credits.AvailableCount);
+        True(credits.Update(11, 0)); Equal<int?>(0, credits.AvailableCount);
+        True(credits.Update(11, null)); Equal<int?>(null, credits.AvailableCount);
+        True(credits.Update(11, 1));
+        True(credits.Update(11, -1)); Equal<int?>(null, credits.AvailableCount);
     }),
+    ("WPF and tray menus preserve shared labels checks disabled actions and children", () => RunSta(() =>
+    {
+        var calls = 0;
+        foreach (var language in new[] { UiLanguage.English, UiLanguage.Russian })
+        {
+            L.SetLanguage(language);
+            var entries = new[]
+            {
+                new PetMenuEntry(L.T("appearance"), Children:
+                    [new(L.T("history"), () => calls++, Checked: true), new(L.T("pixel"), Checked: false)]),
+                new PetMenuEntry(L.T("updatechecking"), () => calls++, Enabled: false),
+                new PetMenuEntry(L.T("resetcredits") + ": " + ResetCreditsFormatter.Format(null), Enabled: false),
+                PetMenuEntry.Separator(),
+                new PetMenuEntry(L.T("quit"), () => calls++)
+            };
+            foreach (var entry in entries) CheckMenuRendering(entry);
+            var command = new PetMenuEntry("command", () => calls++);
+            using var tray = (System.Windows.Forms.ToolStripMenuItem)TrayService.RenderEntry(command);
+            tray.PerformClick();
+            var wpf = (System.Windows.Controls.MenuItem)MainWindow.RenderMenuEntry(command);
+            wpf.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.MenuItem.ClickEvent));
+            wpf.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+        }
+        Equal(4, calls);
+        L.SetLanguage(UiLanguage.English);
+    })),
     ("cmd launcher is non-interactive", () =>
     {
         var info = CodexLocator.CreateStartInfo(@"C:\tools\codex.cmd");
@@ -245,6 +295,36 @@ if (failures == 0 && args.Contains("--integration"))
 return failures == 0 ? 0 : 1;
 
 static void True(bool value) { if (!value) throw new InvalidOperationException("Expected true."); }
+static void RunSta(Action action)
+{
+    Exception? failure = null;
+    var thread = new Thread(() => { try { action(); } catch (Exception error) { failure = error; } });
+    thread.SetApartmentState(ApartmentState.STA);
+    thread.Start();
+    thread.Join();
+    if (failure is not null) throw new InvalidOperationException("STA menu check failed", failure);
+}
+static void CheckMenuRendering(PetMenuEntry entry)
+{
+    using var tray = TrayService.RenderEntry(entry);
+    var wpf = MainWindow.RenderMenuEntry(entry);
+    if (entry.IsSeparator)
+    {
+        True(tray is System.Windows.Forms.ToolStripSeparator);
+        True(wpf is System.Windows.Controls.Separator);
+        return;
+    }
+    var wpfItem = (System.Windows.Controls.MenuItem)wpf;
+    var trayItem = (System.Windows.Forms.ToolStripMenuItem)tray;
+    Equal(entry.Text, trayItem.Text); Equal(entry.Text, wpfItem.Header);
+    Equal(entry.Enabled, trayItem.Enabled); Equal(entry.Enabled, wpfItem.IsEnabled);
+    Equal(entry.Checked == true, trayItem.Checked); Equal(entry.Checked == true, wpfItem.IsChecked);
+    Equal(entry.Checked.HasValue, wpfItem.IsCheckable);
+    Equal(entry.Children?.Count ?? 0, trayItem.DropDownItems.Count);
+    Equal(entry.Children?.Count ?? 0, wpfItem.Items.Count);
+    if (entry.Children is { } children)
+        foreach (var child in children) CheckMenuRendering(child);
+}
 static void Equal<T>(T expected, T actual)
 { if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new InvalidOperationException($"Expected {expected}, got {actual}."); }
 static void Throws<T>(Action action) where T : Exception

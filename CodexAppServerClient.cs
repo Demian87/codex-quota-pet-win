@@ -10,7 +10,7 @@ public sealed class CodexAppServerClient : IDisposable
     private static readonly string ClientVersion =
         typeof(CodexAppServerClient).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion.Split('+')[0] ?? "1.5.0";
+            .InformationalVersion.Split('+')[0] ?? "1.6.0";
 
     private Process? _process;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
@@ -147,9 +147,9 @@ public sealed class CodexAppServerClient : IDisposable
 
         if (payload.TryGetProperty("rateLimitResetCredits", out var credits) &&
             credits.ValueKind == JsonValueKind.Object &&
-            GetInt(credits, "availableCount") is { } count)
+            GetInt(credits, "availableCount") is { } count && count >= 0)
         {
-            availableCount = Math.Max(0, count);
+            availableCount = count;
             return true;
         }
 
@@ -173,7 +173,7 @@ public sealed class CodexAppServerClient : IDisposable
     private static string? GetString(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
     private static int? GetInt(JsonElement e, string name) =>
-        e.TryGetProperty(name, out var v) && v.TryGetInt32(out var n) ? n : null;
+        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : null;
     private static long? GetLong(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.TryGetInt64(out var n) ? n : null;
 

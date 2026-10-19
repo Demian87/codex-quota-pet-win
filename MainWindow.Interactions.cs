@@ -48,40 +48,42 @@ public partial class MainWindow
         WispScale.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
     }
 
+    private Func<IReadOnlyList<PetMenuEntry>>? _menuProvider;
+
+    public void SetMenuProvider(Func<IReadOnlyList<PetMenuEntry>> provider)
+    {
+        _menuProvider = provider;
+        BuildContextMenu();
+    }
+
+    public void RefreshContextMenu() => BuildContextMenu();
+
     private void BuildContextMenu()
     {
+        // Do not replace an open popup during quota refresh or keyboard navigation.
+        if (PetSurface.ContextMenu?.IsOpen == true) return;
         var menu = new ContextMenu();
-        menu.Items.Add(Item(L.T("refresh"), async () => await _state.RefreshAsync()));
-
-        var appearance = new MenuItem { Header = L.T("appearance") };
-        var sizes = new MenuItem { Header = L.T("size") };
-        foreach (var size in Enum.GetValues<PetSize>())
-        {
-            var key = size switch { PetSize.Small => "small", PetSize.Large => "large", _ => "medium" };
-            sizes.Items.Add(CheckItem(L.T(key), _state.Settings.PetSize == size, _ => _state.SetPetSize(size)));
-        }
-        appearance.Items.Add(sizes);
-        var styles = new MenuItem { Header = L.T("tooltip") };
-        foreach (var style in Enum.GetValues<TooltipStyle>())
-            styles.Items.Add(CheckItem(L.T(style == TooltipStyle.Smooth ? "smooth" : "pixel"), _state.Settings.TooltipStyle == style, _ => _state.SetTooltipStyle(style)));
-        appearance.Items.Add(styles);
-        appearance.Items.Add(CheckItem(L.T("history"), _state.Settings.ShowHistory, v => _state.SetShowHistory(v)));
-        appearance.Items.Add(Item(L.T("clearhistory"), _state.ClearHistory));
-        menu.Items.Add(appearance);
-
-        var behavior = new MenuItem { Header = L.T("behavior") };
-        behavior.Items.Add(Item(_state.Settings.PetVisible ? L.T("hide") : L.T("show"), () => _state.SetPetVisible(!_state.Settings.PetVisible)));
-        behavior.Items.Add(CheckItem(L.T("lock"), _state.Settings.LockPosition, v => _state.SetLockPosition(v)));
-        behavior.Items.Add(CheckItem(L.T("clickthrough"), _state.Settings.ClickThrough, v => _state.SetClickThrough(v)));
-        behavior.Items.Add(CheckItem(L.T("codexactive"), _state.Settings.ShowOnlyWhenCodexActive, v => _state.SetShowOnlyWhenCodexActive(v)));
-        behavior.Items.Add(CheckItem(L.T("fullscreen"), _state.Settings.HideInFullscreen, v => _state.SetHideInFullscreen(v)));
-        behavior.Items.Add(CheckItem(L.T("autostart"), _state.Settings.LaunchAtLogin, v => _state.SetAutoStart(v)));
-        menu.Items.Add(behavior);
+        foreach (var entry in _menuProvider?.Invoke() ?? []) menu.Items.Add(RenderMenuEntry(entry));
+        menu.Closed += (_, _) => Dispatcher.BeginInvoke(BuildContextMenu);
         PetSurface.ContextMenu = menu;
     }
 
-    private static MenuItem Item(string title, Action action)
-    { var item = new MenuItem { Header = title }; item.Click += (_, _) => action(); return item; }
-    private static MenuItem CheckItem(string title, bool value, Action<bool> action)
-    { var item = new MenuItem { Header = title, IsCheckable = true, IsChecked = value }; item.Click += (_, _) => action(item.IsChecked); return item; }
+    internal static object RenderMenuEntry(PetMenuEntry entry)
+    {
+        if (entry.IsSeparator) return new Separator();
+        var item = new MenuItem
+        {
+            Header = entry.Text, IsEnabled = entry.Enabled,
+            IsCheckable = entry.Checked.HasValue, IsChecked = entry.Checked == true
+        };
+        if (entry.Children is { } children)
+            foreach (var child in children) item.Items.Add(RenderMenuEntry(child));
+        if (entry.Action is { } action) item.Click += (_, e) =>
+        {
+            e.Handled = true;
+            // Let the popup close before opening dialogs or hiding the pet.
+            item.Dispatcher.BeginInvoke(action);
+        };
+        return item;
+    }
 }

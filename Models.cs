@@ -24,7 +24,7 @@ public sealed class ConnectionResetCredits
     }
 
     public bool Update(long generation, int? availableCount) =>
-        generation == _generation && Set(availableCount is { } count ? Math.Max(0, count) : null);
+        generation == _generation && Set(availableCount is >= 0 ? availableCount : null);
 
     public bool End(long generation) => generation == _generation && Set(null);
 
@@ -40,9 +40,9 @@ public sealed class ConnectionResetCredits
 
 public static class ResetCreditsFormatter
 {
-    public static string? Format(int? availableCount) => availableCount switch
+    public static string Format(int? availableCount) => availableCount switch
     {
-        null or <= 0 => null,
+        null or < 0 => L.T("dataunavailable"),
         > 99 => "99+",
         _ => availableCount.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
     };

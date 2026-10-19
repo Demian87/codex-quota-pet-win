@@ -140,8 +140,8 @@ public partial class MainWindow : Window
         SecondaryPanel.Visibility = SecondarySeparator.Visibility = SecondaryReset.Visibility = secondary is null ? Visibility.Collapsed : Visibility.Visible;
         var resetCredits = ResetCreditsFormatter.Format(_state.ResetCreditsAvailableCount);
         ResetCreditsLabel.Text = L.T("resetcredits");
-        ResetCreditsCount.Text = resetCredits ?? "";
-        ResetCreditsPanel.Visibility = resetCredits is null ? Visibility.Collapsed : Visibility.Visible;
+        ResetCreditsCount.Text = resetCredits;
+        ResetCreditsPanel.Visibility = Visibility.Visible;
         HistoryPanel.Visibility = _state.Settings.ShowHistory ? Visibility.Visible : Visibility.Collapsed;
         HistoryLabel.Text = L.T("historytitle");
         var history = _state.History.Presentation();
@@ -167,7 +167,8 @@ public partial class MainWindow : Window
     private string ConnectionLabel() => (_state.Connection switch
     { ConnectionStatus.Connecting => L.T("connecting"), ConnectionStatus.Reconnecting => L.T("reconnecting"), _ => L.T("disconnected") })
         + (string.IsNullOrWhiteSpace(_state.LastError) ? "" : $"\n{_state.LastError}");
-    private string AccessibleSummary() => $"{L.T("app")}. {PrimaryPercent.Text} {L.T("available")}. {ModeText.Text}. {ConnectionLabel()}";
+    private string AccessibleSummary() => $"{L.T("app")}. {PrimaryPercent.Text} {L.T("available")}. {ModeText.Text}. "
+        + $"{L.T("resetcredits")}: {_state.ResetCreditsAvailableCount?.ToString() ?? L.T("dataunavailable")}. {ConnectionLabel()}";
     private void QuotaToolTip_Opened(object sender, RoutedEventArgs e) { _ = _state.RefreshAsync(); UpdateTooltip(); }
     private void Pet_MouseEnter(object sender, MouseEventArgs e) => _ = _state.RefreshAsync();
     private void Pet_MouseLeave(object sender, MouseEventArgs e) { }

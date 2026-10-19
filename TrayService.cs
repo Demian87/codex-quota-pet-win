@@ -22,12 +22,14 @@ public sealed class TrayService : IDisposable
             Text = "Quota Wisp", Icon = _ownedIcon ?? System.Drawing.SystemIcons.Application, Visible = true
         };
         _icon.DoubleClick += (_, _) => _window.BringPetBack();
+        _window.SetMenuProvider(BuildMenuEntries);
         RebuildMenu();
     }
 
     public void RequestMenuRefresh()
     {
         if (_disposed) return;
+        _window.RefreshContextMenu();
         if (_menuOpen)
         {
             _menuRefreshPending = true;
@@ -49,13 +51,23 @@ public sealed class TrayService : IDisposable
             _menuRefreshPending = false;
             System.Windows.Application.Current.Dispatcher.BeginInvoke(RebuildMenu);
         };
+        foreach (var entry in BuildMenuEntries()) menu.Items.Add(RenderEntry(entry));
+        var old = _icon.ContextMenuStrip; _icon.ContextMenuStrip = menu; old?.Dispose();
+        var primary = _state.Quota?.Primary;
+        _icon.Text = primary is null ? "Quota Wisp" : $"Quota Wisp — {primary.RemainingPercent}%";
+    }
+
+    public IReadOnlyList<PetMenuEntry> BuildMenuEntries()
+    {
+        var menu = new List<PetMenuEntry>();
         var primary = _state.Quota?.Primary;
         Add(menu, primary is null ? $"{L.T("available")}: —" : $"{L.T("available")}: {primary.RemainingPercent}%", null, false);
         if (_state.Quota?.Secondary is { } secondary)
             Add(menu, $"{L.T("weekly")}: {secondary.RemainingPercent}%", null, false);
+        Add(menu, $"{L.T("resetcredits")}: {ResetCreditsFormatter.Format(_state.ResetCreditsAvailableCount)}", null, false);
         if (_state.Connection != ConnectionStatus.Connected)
             Add(menu, _state.LastError ?? L.T("reconnecting"), null, false);
-        menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Add(PetMenuEntry.Separator());
         Add(menu, L.T("refresh"), async () => await _state.RefreshAsync());
 
         var appearance = Submenu(L.T("appearance"));
@@ -63,12 +75,12 @@ public sealed class TrayService : IDisposable
         AddCheck(size, L.T("small"), _state.Settings.PetSize == PetSize.Small, () => _state.SetPetSize(PetSize.Small));
         AddCheck(size, L.T("medium"), _state.Settings.PetSize == PetSize.Medium, () => _state.SetPetSize(PetSize.Medium));
         AddCheck(size, L.T("large"), _state.Settings.PetSize == PetSize.Large, () => _state.SetPetSize(PetSize.Large));
-        appearance.DropDownItems.Add(size);
+        appearance.Children!.Add(size);
 
         var tooltip = Submenu(L.T("tooltip"));
         AddCheck(tooltip, L.T("smooth"), _state.Settings.TooltipStyle == TooltipStyle.Smooth, () => _state.SetTooltipStyle(TooltipStyle.Smooth));
         AddCheck(tooltip, L.T("pixel"), _state.Settings.TooltipStyle == TooltipStyle.Pixel, () => _state.SetTooltipStyle(TooltipStyle.Pixel));
-        appearance.DropDownItems.Add(tooltip);
+        appearance.Children!.Add(tooltip);
         AddCheck(appearance, L.T("history"), _state.Settings.ShowHistory, () => _state.SetShowHistory(!_state.Settings.ShowHistory));
         Add(appearance, L.T("clearhistory"), _state.ClearHistory);
 
@@ -76,8 +88,8 @@ public sealed class TrayService : IDisposable
         AddCheck(language, L.T("auto"), _state.Settings.Language == UiLanguage.Auto, () => _state.SetLanguage(UiLanguage.Auto));
         AddCheck(language, L.T("english"), _state.Settings.Language == UiLanguage.English, () => _state.SetLanguage(UiLanguage.English));
         AddCheck(language, L.T("russian"), _state.Settings.Language == UiLanguage.Russian, () => _state.SetLanguage(UiLanguage.Russian));
-        appearance.DropDownItems.Add(language);
-        menu.Items.Add(appearance);
+        appearance.Children!.Add(language);
+        menu.Add(appearance);
 
         var behavior = Submenu(L.T("behavior"));
         Add(behavior, _state.Settings.PetVisible ? L.T("hide") : L.T("show"), () =>
@@ -91,14 +103,13 @@ public sealed class TrayService : IDisposable
         AddCheck(behavior, L.T("fullscreen"), _state.Settings.HideInFullscreen, () => _state.SetHideInFullscreen(!_state.Settings.HideInFullscreen));
         AddCheck(behavior, L.T("autostart"), _state.Settings.LaunchAtLogin, () => _state.SetAutoStart(!_state.Settings.LaunchAtLogin));
         Add(behavior, L.T("codexpath"), SelectCodexPath);
-        menu.Items.Add(behavior);
+        menu.Add(behavior);
 
         Add(menu, _checkingForUpdates ? L.T("updatechecking") : L.T("checkupdates"), CheckForUpdates, !_checkingForUpdates);
-        menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Add(PetMenuEntry.Separator());
         Add(menu, L.T("quit"), () => System.Windows.Application.Current.Shutdown());
 
-        var old = _icon.ContextMenuStrip; _icon.ContextMenuStrip = menu; old?.Dispose();
-        _icon.Text = primary is null ? "Quota Wisp" : $"Quota Wisp — {primary.RemainingPercent}%";
+        return menu;
     }
 
     private void SelectCodexPath()
@@ -158,15 +169,23 @@ public sealed class TrayService : IDisposable
     public void ShowNotification(string message)
     { _icon.BalloonTipTitle = L.T("app"); _icon.BalloonTipText = message; _icon.ShowBalloonTip(5000); }
 
-    private static Forms.ToolStripMenuItem Submenu(string title) => new(title);
-    private static void Add(Forms.ContextMenuStrip menu, string text, Action? action, bool enabled = true)
-    { var item = new Forms.ToolStripMenuItem(text) { Enabled = enabled }; if (action is not null) item.Click += (_, _) => action(); menu.Items.Add(item); }
-    private static void Add(Forms.ToolStripMenuItem menu, string text, Action? action, bool enabled = true)
-    { var item = new Forms.ToolStripMenuItem(text) { Enabled = enabled }; if (action is not null) item.Click += (_, _) => action(); menu.DropDownItems.Add(item); }
-    private static void AddCheck(Forms.ContextMenuStrip menu, string text, bool check, Action action)
-    { var item = new Forms.ToolStripMenuItem(text) { Checked = check }; item.Click += (_, _) => action(); menu.Items.Add(item); }
-    private static void AddCheck(Forms.ToolStripMenuItem menu, string text, bool check, Action action)
-    { var item = new Forms.ToolStripMenuItem(text) { Checked = check }; item.Click += (_, _) => action(); menu.DropDownItems.Add(item); }
+    private static PetMenuEntry Submenu(string title) => new(title, Children: []);
+    private static void Add(List<PetMenuEntry> menu, string text, Action? action, bool enabled = true)
+        => menu.Add(new(text, action, enabled));
+    private static void Add(PetMenuEntry menu, string text, Action? action, bool enabled = true)
+        => Add(menu.Children!, text, action, enabled);
+    private static void AddCheck(PetMenuEntry menu, string text, bool check, Action action)
+        => menu.Children!.Add(new(text, action, Checked: check));
+
+    internal static Forms.ToolStripItem RenderEntry(PetMenuEntry entry)
+    {
+        if (entry.IsSeparator) return new Forms.ToolStripSeparator();
+        var item = new Forms.ToolStripMenuItem(entry.Text) { Enabled = entry.Enabled, Checked = entry.Checked == true };
+        if (entry.Children is { } children)
+            foreach (var child in children) item.DropDownItems.Add(RenderEntry(child));
+        if (entry.Action is { } action) item.Click += (_, _) => action();
+        return item;
+    }
 
     public void Dispose()
     {

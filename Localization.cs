@@ -15,6 +15,7 @@ public static class L
         ["available"] = ("AVAILABLE", "ДОСТУПНО"),
         ["weekly"] = ("Weekly", "Недельный"),
         ["resetcredits"] = ("MANUAL RESETS", "РУЧНЫЕ СБРОСЫ"),
+        ["dataunavailable"] = ("Unavailable", "Недоступно"),
         ["reset"] = ("Reset", "Сброс"),
         ["standard"] = ("STANDARD", "ОБЫЧНЫЙ"), ["turbo"] = ("TURBO", "ТУРБО"),
         ["connecting"] = ("Connecting to Codex…", "Подключение к Codex…"),
